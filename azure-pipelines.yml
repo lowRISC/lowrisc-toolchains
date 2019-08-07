@@ -1,0 +1,42 @@
+# Azure Pipelines CI build configuration
+# Documentation at https://aka.ms/yaml
+
+variables:
+  # commit reference in https://github.com/riscv/riscv-gnu-toolchain
+  RISCV_GNU_TOOLCHAIN_COMMIT_ID: 2e334e222d43bcde237c289385c977dcab81eda9
+
+trigger:
+  branches:
+    include:
+    - master
+
+jobs:
+- job: "GCC"
+  displayName: "RV32 GCC"
+  pool:
+    vmImage: "ubuntu-16.04"
+  steps:
+  - bash: |
+      # Dependencies as listed at
+      # https://github.com/riscv/riscv-gnu-toolchain
+      sudo apt-get install -y autoconf automake autotools-dev curl \
+        libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison \
+        flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev
+    displayName: 'Install build dependencies'
+
+  - bash: |
+      sudo mkdir /tools/riscv && sudo chmod 777 /tools/riscv
+      ./build-gcc.sh
+    displayName: 'Build GCC toolchain'
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+
+  - task: GithubRelease@0
+    displayName: 'Upload to GitHub releases'
+    inputs:
+      gitHubConnection: lowrisc-artifact-upload
+      repositoryName: lowrisc/lowrisc-toolchains
+      tagSource: auto
+      assets: |
+          $(Build.ArtifactStagingDirectory)/build.log
+          $(Build.ArtifactStagingDirectory)/*.tar.xz
