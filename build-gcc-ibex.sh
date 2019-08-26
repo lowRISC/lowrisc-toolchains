@@ -15,8 +15,8 @@ git checkout $RISCV_GNU_TOOLCHAIN_COMMIT_ID
 ./configure --prefix=/tools/riscv \
     --with-abi=ilp32 \
     --with-arch=rv32imc \
-    --with-cmodel=medany 2>&1 | tee $ARTIFACT_STAGING_DIR/build.log
-make -j$(nproc) 2>&1 | tee $ARTIFACT_STAGING_DIR/build.log
+    --with-cmodel=medany 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
+make -j$(nproc) 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
 # Includes make install
 
 echo 'Version:' >> /tools/riscv/buildinfo
