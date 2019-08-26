@@ -38,6 +38,8 @@ jobs:
       gitHubConnection: lowrisc-artifact-upload
       repositoryName: lowrisc/lowrisc-toolchains
       tagSource: auto
+      action: edit
+      assetUploadMode: replace
       assets: |
           $(Build.ArtifactStagingDirectory)/*.log
           $(Build.ArtifactStagingDirectory)/*.tar.xz
@@ -69,6 +71,8 @@ jobs:
       gitHubConnection: lowrisc-artifact-upload
       repositoryName: lowrisc/lowrisc-toolchains
       tagSource: auto
+      action: edit
+      assetUploadMode: replace
       assets: |
           $(Build.ArtifactStagingDirectory)/*.log
           $(Build.ArtifactStagingDirectory)/*.tar.xz
