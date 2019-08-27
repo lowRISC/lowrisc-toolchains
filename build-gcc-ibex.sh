@@ -5,7 +5,10 @@ set -x
 
 TOP=$PWD
 
-TOOLCHAIN_NAME=lowrisc-toolchain-gcc-rv32imc-$(git -C $TOP describe --always)
+TAG_NAME="$(git -C $TOP describe --always)"
+echo "##vso[task.setvariable variable=ReleaseTag]$TAG_NAME"
+
+TOOLCHAIN_NAME=lowrisc-toolchain-gcc-rv32imc-$TAG_NAME
 
 mkdir -p build/gcc
 cd build/gcc

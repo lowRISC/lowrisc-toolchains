@@ -26,7 +26,11 @@ jobs:
     displayName: 'Install build dependencies'
 
   - bash: |
-      sudo mkdir /tools/riscv && sudo chmod 777 /tools/riscv
+      set -eux
+
+      sudo mkdir -p /tools/riscv
+      sudo chmod 777 /tools/riscv
+
       ./build-gcc-ibex.sh
     displayName: 'Build GCC toolchain'
     env:
@@ -37,8 +41,10 @@ jobs:
     inputs:
       gitHubConnection: lowrisc-artifact-upload
       repositoryName: lowrisc/lowrisc-toolchains
-      tagSource: auto
+      tagSource: manual
+      tag: "$(ReleaseTag)"
       action: edit
+      addChangeLog: false
       assetUploadMode: replace
       assets: |
           $(Build.ArtifactStagingDirectory)/*.log
@@ -59,7 +65,11 @@ jobs:
     displayName: 'Install build dependencies'
 
   - bash: |
-      sudo mkdir /tools/riscv && sudo chmod 777 /tools/riscv
+      set -eux
+
+      sudo mkdir -p /tools/riscv
+      sudo chmod 777 /tools/riscv
+
       ./build-gcc-multilib.sh
     displayName: 'Build GCC toolchain'
     env:
@@ -70,8 +80,10 @@ jobs:
     inputs:
       gitHubConnection: lowrisc-artifact-upload
       repositoryName: lowrisc/lowrisc-toolchains
-      tagSource: auto
+      tagSource: manual
+      tag: "$(ReleaseTag)"
       action: edit
+      addChangeLog: false
       assetUploadMode: replace
       assets: |
           $(Build.ArtifactStagingDirectory)/*.log
