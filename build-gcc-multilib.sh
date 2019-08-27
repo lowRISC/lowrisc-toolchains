@@ -27,6 +27,8 @@ make clean
     --enable-multilib 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
 make -j$(( `nproc` * 2 )) linux 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
 
+make -j$(( `nproc` * 2 )) build-qemu 2?&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
+
 echo 'Version:' >> /tools/riscv/buildinfo
 git -C $TOP describe --always >> /tools/riscv/buildinfo
 echo >> /tools/riscv/buildinfo
