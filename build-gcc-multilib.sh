@@ -2,6 +2,7 @@
 
 set -e
 set -x
+set -o pipefail
 
 TOP=$PWD
 
