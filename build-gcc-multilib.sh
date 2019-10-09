@@ -19,16 +19,16 @@ git checkout $RISCV_GNU_TOOLCHAIN_COMMIT_ID
 
 # Build ELF Multilib
 ./configure --prefix=/tools/riscv/elf \
-    --enable-multilib 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
-make -j$(( `nproc` * 2 )) 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
+    --enable-multilib
+make -j$(( `nproc` * 2 ))
 
 make clean
 # Build Linux Multilib
 ./configure --prefix=/tools/riscv/linux \
-    --enable-multilib 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
-make -j$(( `nproc` * 2 )) linux 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
+    --enable-multilib
+make -j$(( `nproc` * 2 )) linux
 
-make -j$(( `nproc` * 2 )) build-qemu 2?&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
+make -j$(( `nproc` * 2 )) build-qemu
 
 echo -n 'lowRISC toolchain version: ' >> /tools/riscv/buildinfo
 git -C $TOP describe --always >> /tools/riscv/buildinfo
