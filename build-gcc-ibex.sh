@@ -27,16 +27,13 @@ ct-ng build
 
 ls -l /tools/riscv
 
-echo 'Version:' >> /tools/riscv/buildinfo
+echo -n 'lowRISC toolchain version: ' >> /tools/riscv/buildinfo
 git -C $TOP describe --always >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
-echo 'GCC version:' >> /tools/riscv/buildinfo
+echo -n 'GCC version: ' >> /tools/riscv/buildinfo
 /tools/riscv/bin/riscv32-unknown-elf-gcc --version | head -n1 >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
 echo "Built at $(date -u) on $(hostname)" >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
 tar -cJ \
   --directory=/tools \

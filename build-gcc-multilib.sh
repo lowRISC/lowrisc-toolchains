@@ -30,20 +30,16 @@ make -j$(( `nproc` * 2 )) linux 2>&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLC
 
 make -j$(( `nproc` * 2 )) build-qemu 2?&1 | tee --append $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.log
 
-echo 'Version:' >> /tools/riscv/buildinfo
+echo -n 'lowRISC toolchain version: ' >> /tools/riscv/buildinfo
 git -C $TOP describe --always >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
-echo 'Version of https://github.com/riscv/riscv-gnu-toolchain:' >> /tools/riscv/buildinfo
+echo -n 'Version of https://github.com/riscv/riscv-gnu-toolchain:' >> /tools/riscv/buildinfo
 git -C $TOP/build/gcc/riscv-gnu-toolchain describe --always >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
-echo 'GCC version:' >> /tools/riscv/buildinfo
+echo -n 'GCC version: ' >> /tools/riscv/buildinfo
 /tools/riscv/elf/bin/riscv64-unknown-elf-gcc --version | head -n1 >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
 echo "Built at $(date -u) on $(hostname)" >> /tools/riscv/buildinfo
-echo >> /tools/riscv/buildinfo
 
 tar -cJ \
   --directory=/tools \
