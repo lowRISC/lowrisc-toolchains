@@ -1,0 +1,19 @@
+steps:
+- publish: $(Build.ArtifactStagingDirectory)
+  artifact: ${{ parameters.azure_name }}
+  displayName: "Upload Azure Artifact"
+
+- task: GithubRelease@0
+  displayName: 'Upload GitHub Release (if tagged)'
+  condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+  inputs:
+    gitHubConnection: lowrisc-artifact-upload
+    repositoryName: lowrisc/lowrisc-toolchains
+    tagSource: manual
+    tag: "$(ReleaseTag)"
+    action: edit
+    addChangeLog: false
+    assetUploadMode: replace
+    isPreRelease: true
+    assets: |
+        $(Build.ArtifactStagingDirectory)/*.tar.xz

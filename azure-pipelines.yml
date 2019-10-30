@@ -1,10 +1,6 @@
 # Azure Pipelines CI build configuration
 # Documentation at https://aka.ms/yaml
 
-variables:
-  # commit reference in https://github.com/riscv/riscv-gnu-toolchain
-  RISCV_GNU_TOOLCHAIN_COMMIT_ID: 2e334e222d43bcde237c289385c977dcab81eda9
-
 trigger:
   batch: true
   branches:
@@ -19,88 +15,96 @@ pr:
     - '*'
 
 jobs:
-- job: "GCC_Ibex"
-  displayName: "RV32IMC GCC (Ibex)"
+- job: "Toolchains_RV32IMC"
+  displayName: "GCC and Clang/LLVM toolchains targeting RV32IMC (Ibex)"
   pool:
     vmImage: "ubuntu-16.04"
   timeoutInMinutes: 360
   steps:
-  - bash: |
-      sudo apt-get install -y build-essential autoconf bison flex \
-        texinfo help2man gawk libtool-bin libncurses5-dev git libtool \
-        gettext wget curl
-    displayName: 'Install build dependencies'
+  - template: "_build-deps.yml"
 
   - bash: |
-      ./install-crosstool-ng.sh
-    displayName: 'Build and install crosstool-ng'
-
-  - bash: |
-      # crosstools-NG needs the ability to create and chmod the
-      # /tools/riscv directory.
-      sudo mkdir -p /tools \
-        && sudo chmod 777 /tools \
-        && mkdir -p /tools/riscv \
-        && ./build-gcc-ibex.sh
+      ./build-gcc-with-args.sh \
+        "lowrisc-toolchain-gcc-rv32imc" \
+        "riscv32-unknown-elf" \
+        "/tools/riscv" \
+        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
 
-  - publish: $(Build.ArtifactStagingDirectory)
-    artifact: gcc-ibex
-    displayName: "Upload GCC for Ibex as Azure artifact"
+  - bash: |
+      ./build-clang-with-args.sh \
+        "lowrisc-toolchain-rv32imc" \
+        "riscv32-unknown-elf" \
+        "/tools/riscv" \
+        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
+    displayName: "Build Clang toolchain"
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
 
-  - task: GithubRelease@0
-    displayName: 'Upload to GitHub releases'
-    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
-    inputs:
-      gitHubConnection: lowrisc-artifact-upload
-      repositoryName: lowrisc/lowrisc-toolchains
-      tagSource: manual
-      tag: "$(ReleaseTag)"
-      action: edit
-      addChangeLog: false
-      assetUploadMode: replace
-      assets: |
-          $(Build.ArtifactStagingDirectory)/*.tar.xz
+  - template: "_upload-artifacts.yml"
+    parameters:
+      azure_name: rv32imc-toolchains
 
-- job: "GCC_Multilib"
-  displayName: "RV64 GCC (Multilib)"
+- job: "GCC_Multilib_Baremetal"
+  displayName: "RV64 GCC (Multilib Baremetal)"
   condition: false
   pool:
     vmImage: "ubuntu-16.04"
   timeoutInMinutes: 360
   steps:
-  - bash: |
-      # Dependencies as listed at
-      # https://github.com/riscv/riscv-gnu-toolchain
-      sudo apt-get install -y autoconf automake autotools-dev curl \
-        libmpc-dev libmpfr-dev libgmp-dev gawk build-essential bison \
-        flex texinfo gperf libtool patchutils bc zlib1g-dev libexpat-dev
-    displayName: 'Install build dependencies'
+  - template: "_build-deps.yml"
 
   - bash: |
-      sudo mkdir -p /tools/riscv \
-        && sudo chmod 777 /tools/riscv \
-        && ./build-gcc-multilib.sh
+      ./build-gcc-with-args.sh \
+        "lowrisc-toolchain-gcc-multilib-baremetal" \
+        "riscv64-unknown-elf" \
+        "/opt/riscv-baremetal-toolchain"
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
 
-  - publish: $(Build.ArtifactStagingDirectory)
-    artifact: gcc-multilib
-    displayName: "Upload multilib GCC builds as Azure artifact"
+  - bash: |
+      ./build-clang-with-args.sh \
+        "lowrisc-toolchain-gcc-multilib-baremetal" \
+        "riscv64-unknown-elf" \
+        "/opt/riscv-baremetal-toolchain"
+    displayName: "Build Clang toolchain"
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
 
-  - task: GithubRelease@0
-    displayName: 'Upload to GitHub releases'
-    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
-    inputs:
-      gitHubConnection: lowrisc-artifact-upload
-      repositoryName: lowrisc/lowrisc-toolchains
-      tagSource: manual
-      tag: "$(ReleaseTag)"
-      action: edit
-      addChangeLog: false
-      assetUploadMode: replace
-      assets: |
-          $(Build.ArtifactStagingDirectory)/*.tar.xz
+  - template: "_upload-artifacts.yml"
+    parameters:
+      azure_name: gcc-multilib-baremetal
+
+- job: "GCC_Multilib_Linux"
+  displayName: "RV64 GCC (Multilib Linux)"
+  condition: false
+  pool:
+    vmImage: "ubuntu-16.04"
+  timeoutInMinutes: 360
+  steps:
+  - template: "_build-deps.yml"
+
+  - bash: |
+      ./build-gcc-with-args.sh \
+        "lowrisc-toolchain-gcc-multilib-linux" \
+        "riscv64-unknown-linux-gnu" \
+        "/opt/riscv-linux-toolchain"
+    displayName: 'Build GCC toolchain'
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+
+  - bash: |
+      ./build-clang-with-args.sh \
+        "lowrisc-toolchain-gcc-multilib-linux" \
+        "riscv64-unknown-linux-gnu" \
+        "/opt/riscv-linux-toolchain"
+    displayName: "Build Clang toolchain"
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+
+  - template: "_upload-artifacts.yml"
+    parameters:
+      azure_name: gcc-multilib-linux
