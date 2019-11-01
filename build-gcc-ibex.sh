@@ -35,9 +35,10 @@ echo -n 'GCC version: ' >> /tools/riscv/buildinfo
 
 echo "Built at $(date -u) on $(hostname)" >> /tools/riscv/buildinfo
 
+mv /tools/riscv "/tools/${TOOLCHAIN_NAME}"
+
 tar -cJ \
   --directory=/tools \
   -f $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.tar.xz \
-  --transform="s@riscv@$TOOLCHAIN_NAME@" \
   --owner=0 --group=0 \
-  riscv
+  "${TOOLCHAIN_NAME}"
