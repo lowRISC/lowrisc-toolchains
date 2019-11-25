@@ -27,13 +27,24 @@ ct-ng build
 
 ls -l /tools/riscv
 
-echo -n 'lowRISC toolchain version: ' >> /tools/riscv/buildinfo
-git -C $TOP describe --always >> /tools/riscv/buildinfo
+gcc_version="$(/tools/riscv/bin/riscv32-unknown-elf-gcc --version | head -n1)"
+built_at="$(date -u)"
 
-echo -n 'GCC version: ' >> /tools/riscv/buildinfo
-/tools/riscv/bin/riscv32-unknown-elf-gcc --version | head -n1 >> /tools/riscv/buildinfo
+tee "/tools/riscv/buildinfo" <<BUILDINFO
+lowRISC toolchain version: ${TAG_NAME}
+GCC version: ${gcc_version}
+Built at ${built_at} on $(hostname)
+BUILDINFO
 
-echo "Built at $(date -u) on $(hostname)" >> /tools/riscv/buildinfo
+tee "/tools/riscv/buildinfo.json" <<BUILDINFO_JSON
+{
+  "toolchain_config":"lowrisc-toolchain-gcc-rv32imc",
+  "version":"${TAG_NAME}",
+  "build_date":"${built_at}",
+  "build_host":"$(hostname)",
+  "gcc_version":"${gcc_version}"
+}
+BUILDINFO_JSON
 
 mv /tools/riscv "/tools/${TOOLCHAIN_NAME}"
 
