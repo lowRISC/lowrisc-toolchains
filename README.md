@@ -43,3 +43,17 @@ How to do a release
    Now the release builds on Azure Pipelines, and the resulting binaries
    will be uploaded to
    [GitHub releases](https://github.com/lowRISC/lowrisc-toolchains/releases).
+
+How to generate the bitmanip patches
+------------------------------------
+
+1. Generate the binutils patch.
+
+   ```
+   git clone https://github.com/riscv/riscv-binutils-gdb.git
+   cd riscv-binutils-gdb
+   git checkout riscv-bitmanip
+   git diff 612aac65 > 001-bitmanip.patch # 612aac65 is our upstream baseline
+   ```
+
+2. Generate the GCC patch: TODO.

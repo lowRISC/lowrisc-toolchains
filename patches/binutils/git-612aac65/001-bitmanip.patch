@@ -1,0 +1,1427 @@
+diff --git a/bfd/elfnn-riscv.c b/bfd/elfnn-riscv.c
+index 4ffe6a36e6..083ed19782 100644
+--- a/bfd/elfnn-riscv.c
++++ b/bfd/elfnn-riscv.c
+@@ -2706,30 +2706,6 @@ riscv_std_ext_p (const char *name)
+   return (strlen (name) == 1) && (name[0] != 'x') && (name[0] != 's');
+ }
+ 
+-/* Predicator for non-standard extension.  */
+-
+-static bfd_boolean
+-riscv_non_std_ext_p (const char *name)
+-{
+-  return (strlen (name) >= 2) && (name[0] == 'x');
+-}
+-
+-/* Predicator for standard supervisor extension.  */
+-
+-static bfd_boolean
+-riscv_std_sv_ext_p (const char *name)
+-{
+-  return (strlen (name) >= 2) && (name[0] == 's') && (name[1] != 'x');
+-}
+-
+-/* Predicator for non-standard supervisor extension.  */
+-
+-static bfd_boolean
+-riscv_non_std_sv_ext_p (const char *name)
+-{
+-  return (strlen (name) >= 3) && (name[0] == 's') && (name[1] == 'x');
+-}
+-
+ /* Error handler when version mis-match.  */
+ 
+ static void
+@@ -2855,53 +2831,95 @@ riscv_merge_std_ext (bfd *ibfd,
+   return TRUE;
+ }
+ 
+-/* Merge non-standard and supervisor extensions.
+-   Return Value:
+-     Return FALSE if failed to merge.
++static const char *
++riscv_skip_prefix (const char *ext, riscv_isa_ext_class_t c)
++{
++  switch (c)
++    {
++    case RV_ISA_CLASS_X: return &ext[1];
++    case RV_ISA_CLASS_S: return &ext[1];
++    case RV_ISA_CLASS_Z: return &ext[1];
++    default: return ext;
++    }
++}
+ 
+-   Arguments:
+-     `bfd`: bfd handler.
+-     `in_arch`: Raw arch string for input object.
+-     `out_arch`: Raw arch string for output object.
+-     `pin`: subset list for input object, and it'll skip all merged subset after
+-            merge.
+-     `pout`: Like `pin`, but for output object. */
++/* Compare prefixed extension names canonically.  */
++
++static int
++riscv_prefix_cmp (const char *a, const char *b)
++{
++  riscv_isa_ext_class_t ca = riscv_get_prefix_class (a);
++  riscv_isa_ext_class_t cb = riscv_get_prefix_class (b);
++
++  /* Extension name without prefix  */
++  const char *anp = riscv_skip_prefix (a, ca);
++  const char *bnp = riscv_skip_prefix (b, cb);
++
++  if (ca == cb)
++    return strcmp (anp, bnp);
++
++  return (int)ca - (int)cb;
++}
+ 
+ static bfd_boolean
+-riscv_merge_non_std_and_sv_ext (bfd *ibfd,
+-				riscv_subset_t **pin,
+-				riscv_subset_t **pout,
+-				bfd_boolean (*predicate_func) (const char *))
++riscv_merge_multi_letter_ext (bfd *ibfd,
++			      riscv_subset_t **pin,
++			      riscv_subset_t **pout)
+ {
+   riscv_subset_t *in = *pin;
+   riscv_subset_t *out = *pout;
++  riscv_subset_t *tail;
+ 
+-  for (in = *pin; in != NULL && predicate_func (in->name); in = in->next)
+-    riscv_add_subset (&merged_subsets, in->name, in->major_version,
+-		      in->minor_version);
++  int cmp;
+ 
+-  for (out = *pout; out != NULL && predicate_func (out->name); out = out->next)
++  while (in && out)
+     {
+-      riscv_subset_t *find_ext =
+-	riscv_lookup_subset (&merged_subsets, out->name);
+-      if (find_ext != NULL)
++      cmp = riscv_prefix_cmp (in->name, out->name);
++
++      if (cmp < 0)
++	{
++	  /* `in' comes before `out', append `in' and increment.  */
++	  riscv_add_subset (&merged_subsets, in->name, in->major_version,
++			    in->minor_version);
++	  in = in->next;
++	}
++      else if (cmp > 0)
++	{
++	  /* `out' comes before `in', append `out' and increment.  */
++	  riscv_add_subset (&merged_subsets, out->name, out->major_version,
++			    out->minor_version);
++	  out = out->next;
++	}
++      else
+ 	{
+-	  /* Check version is same or not. */
+-	  /* TODO: Allow different merge policy.  */
+-	  if ((find_ext->major_version != out->major_version)
+-	      || (find_ext->minor_version != out->minor_version))
++	  /* Both present, check version and increment both.  */
++	  if ((in->major_version != out->major_version)
++	      || (in->minor_version != out->minor_version))
+ 	    {
+-	      riscv_version_mismatch (ibfd, find_ext, out);
++	      riscv_version_mismatch (ibfd, in, out);
+ 	      return FALSE;
+ 	    }
++
++	  riscv_add_subset (&merged_subsets, out->name, out->major_version,
++			    out->minor_version);
++	  out = out->next;
++	  in = in->next;
+ 	}
+-      else
+-	riscv_add_subset (&merged_subsets, out->name,
+-			  out->major_version, out->minor_version);
+     }
+ 
+-  *pin = in;
+-  *pout = out;
++  if (in || out) {
++    /* If we're here, either `in' or `out' is running longer than
++       the other. So, we need to append the corresponding tail.  */
++    tail = in ? in : out;
++
++    while (tail)
++      {
++	riscv_add_subset (&merged_subsets, tail->name, tail->major_version,
++			  tail->minor_version);
++	tail = tail->next;
++      }
++  }
++
+   return TRUE;
+ }
+ 
+@@ -2960,14 +2978,9 @@ riscv_merge_arch_attr_info (bfd *ibfd, char *in_arch, char *out_arch)
+   /* Merge standard extension.  */
+   if (!riscv_merge_std_ext (ibfd, in_arch, out_arch, &in, &out))
+     return NULL;
+-  /* Merge non-standard extension.  */
+-  if (!riscv_merge_non_std_and_sv_ext (ibfd, &in, &out, riscv_non_std_ext_p))
+-    return NULL;
+-  /* Merge standard supervisor extension.  */
+-  if (!riscv_merge_non_std_and_sv_ext (ibfd, &in, &out, riscv_std_sv_ext_p))
+-    return NULL;
+-  /* Merge non-standard supervisor extension.  */
+-  if (!riscv_merge_non_std_and_sv_ext (ibfd, &in, &out, riscv_non_std_sv_ext_p))
++
++  /* Merge all non-single letter extensions with single call.  */
++  if (!riscv_merge_multi_letter_ext (ibfd, &in, &out))
+     return NULL;
+ 
+   if (xlen_in != xlen_out)
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 245717f70f..b0d53766e2 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1193,7 +1193,7 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+     {
+       char subset[2] = {0, 0};
+ 
+-      if (*p == 'x' || *p == 's')
++      if (*p == 'x' || *p == 's' || *p == 'z')
+ 	break;
+ 
+       if (*p == '_')
+@@ -1237,28 +1237,58 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+   return p;
+ }
+ 
+-/* Parsing function for non-standard and supervisor extensions.
++/* Classify the argument 'arch' into one of riscv_isa_ext_class_t.  */
+ 
+-   Return Value:
+-     Points to the end of extensions.
++riscv_isa_ext_class_t
++riscv_get_prefix_class (const char *arch)
++{
++  switch (*arch)
++    {
++    case 's':
++      return RV_ISA_CLASS_S;
+ 
+-   Arguments:
+-     `rps`: Hooks and status for parsing subset.
+-     `march`: Full arch string.
+-     `p`: Curent parsing position.
+-     `ext_type`: What kind of extensions, 'x', 's' or 'sx'.
+-     `ext_type_str`: Full name for kind of extension.  */
++    case 'x': return RV_ISA_CLASS_X;
++    case 'z': return RV_ISA_CLASS_Z;
++    default: return RV_ISA_CLASS_UNKNOWN;
++    }
++}
++
++/* Structure describing parameters to use when parsing a particular
++   riscv_isa_ext_class_t. One of these should be provided for each
++   possible class, except RV_ISA_CLASS_UNKNOWN.  */
++
++typedef struct riscv_parse_config
++{
++  /* Class of the extension. */
++  riscv_isa_ext_class_t class;
++
++  /* Lower-case prefix string for error printing
++     and internal parser usage, e.g. "z", "x".  */
++  const char *prefix;
++
++  /* Predicate which is used for checking whether
++     this is a "known" extension. For 'x',
++     it always returns true (since they are by
++     definition non-standard and cannot be known.  */
++  bfd_boolean (*ext_valid_p) (const char *);
++} riscv_parse_config_t;
++
++/* Parse a generic prefixed extension.
++   march: The full architecture string as passed in by "-march=...".
++   p: Point from which to start parsing the -march string.
++   config: What class of extensions to parse, predicate funcs,
++   and strings to use in error reporting.  */
+ 
+ static const char *
+-riscv_parse_sv_or_non_std_ext (riscv_parse_subset_t *rps,
+-			       const char *march,
+-			       const char *p,
+-			       const char *ext_type,
+-			       const char *ext_type_str)
++riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
++			  const char *march,
++			  const char *p,
++			  const riscv_parse_config_t *config)
+ {
+   unsigned major_version = 0;
+   unsigned minor_version = 0;
+-  size_t ext_type_len = strlen (ext_type);
++  const char *last_name;
++  riscv_isa_ext_class_t class;
+ 
+   while (*p)
+     {
+@@ -1268,12 +1298,9 @@ riscv_parse_sv_or_non_std_ext (riscv_parse_subset_t *rps,
+ 	  continue;
+ 	}
+ 
+-      if (strncmp (p, ext_type, ext_type_len) != 0)
+-	break;
+-
+-      /* It's non-standard supervisor extension if it prefix with sx.  */
+-      if ((ext_type[0] == 's') && (ext_type_len == 1)
+-	  && (*(p + 1) == 'x'))
++      /* Assert that the current extension specifier matches our parsing class.  */
++      class = riscv_get_prefix_class (p);
++      if (class != config->class)
+ 	break;
+ 
+       char *subset = xstrdup (p);
+@@ -1294,6 +1321,43 @@ riscv_parse_sv_or_non_std_ext (riscv_parse_subset_t *rps,
+ 
+       *q = '\0';
+ 
++      /* Check that the name is valid.
++	 For 'x', anything goes but it cannot simply be 'x'.
++	 For 'z', it must be known from a list and also cannot simply be 'z'.
++	 For 's', it must be known from a list and also *can* simply be 's'.  */
++
++      /* Check that the extension name is well-formed.  */
++      if (!config->ext_valid_p (subset))
++	{
++	  rps->error_handler
++	    ("-march=%s: Invalid or unknown %s ISA extension: '%s'",
++	     march, config->prefix, subset);
++	  free (subset);
++	  return NULL;
++	}
++
++      /* Check that the last item is not the same as this.  */
++      last_name = rps->subset_list->tail->name;
++
++      if (!strcasecmp (last_name, subset))
++	{
++	  rps->error_handler ("-march=%s: Duplicate %s ISA extension: \'%s\'",
++			      march, config->prefix, subset);
++	  free (subset);
++	  return NULL;
++	}
++
++      /* Check that we are in alphabetical order within the subset.  */
++      if (!strncasecmp (last_name, config->prefix, 1)
++	  && strcasecmp (last_name, subset) > 0)
++	{
++	  rps->error_handler ("-march=%s: %s ISA extension not in alphabetical order: "
++			      "\'%s\' must come before \'%s\'.",
++			      march, config->prefix, subset, last_name);
++	  free (subset);
++	  return NULL;
++	}
++
+       riscv_add_subset (rps->subset_list, subset, major_version, minor_version);
+       free (subset);
+       p += end_of_version - subset;
+@@ -1301,7 +1365,7 @@ riscv_parse_sv_or_non_std_ext (riscv_parse_subset_t *rps,
+       if (*p != '\0' && *p != '_')
+ 	{
+ 	  rps->error_handler ("-march=%s: %s must seperate with _",
+-			      march, ext_type_str);
++			      march, config->prefix);
+ 	  return NULL;
+ 	}
+     }
+@@ -1309,6 +1373,69 @@ riscv_parse_sv_or_non_std_ext (riscv_parse_subset_t *rps,
+   return p;
+ }
+ 
++const char * const riscv_std_z_ext_strtab[] =
++  {
++   "zbb", "zbc", "zbe", "zbf", "zbm", "zbp", "zbr", "zbs", "zbt", NULL
++  };
++
++const char * const riscv_std_s_ext_strtab[] =
++  {
++   NULL
++  };
++
++static bfd_boolean
++riscv_multi_letter_ext_valid_p (const char *ext,
++				const char *const *known_exts)
++{
++  for (size_t i = 0; known_exts[i]; ++i)
++    {
++      if (!strcmp (ext, known_exts[i]))
++	return TRUE;
++    }
++
++  return FALSE;
++}
++
++/* Predicator function for x-prefixed extensions.
++   Anything goes, except the literal 'x'.  */
++
++static bfd_boolean
++riscv_ext_x_valid_p (const char *arg)
++{
++  if (!strcasecmp (arg, "x"))
++    return FALSE;
++
++  return TRUE;
++}
++
++/* Predicator functions for z-prefixed extensions.
++   Only known z-extensions are permitted.  */
++
++static bfd_boolean
++riscv_ext_z_valid_p (const char *arg)
++{
++  return riscv_multi_letter_ext_valid_p (arg, riscv_std_z_ext_strtab);
++}
++
++/* Predicator function for 's' prefixed extensions.
++   Must be either literal 's', or a known s-prefixed extension.  */
++
++static bfd_boolean
++riscv_ext_s_valid_p (const char *arg)
++{
++  return riscv_multi_letter_ext_valid_p (arg, riscv_std_s_ext_strtab);
++}
++
++/* Parsing order that is needed for bitmanip.  */
++
++static const riscv_parse_config_t parse_config[] =
++{
++   {RV_ISA_CLASS_S, "s", riscv_ext_s_valid_p},
++   {RV_ISA_CLASS_Z, "z", riscv_ext_z_valid_p},
++   {RV_ISA_CLASS_X, "x", riscv_ext_x_valid_p},
++   {RV_ISA_CLASS_UNKNOWN, NULL, NULL}
++};
++
+ /* Function for parsing arch string.
+ 
+    Return Value:
+@@ -1347,26 +1474,14 @@ riscv_parse_subset (riscv_parse_subset_t *rps,
+   if (p == NULL)
+     return FALSE;
+ 
+-  /* Parsing non-standard extension.  */
+-  p = riscv_parse_sv_or_non_std_ext (
+-	rps, arch, p, "x", "non-standard extension");
+-
+-  if (p == NULL)
+-    return FALSE;
+-
+-  /* Parsing supervisor extension.  */
+-  p = riscv_parse_sv_or_non_std_ext (
+-	rps, arch, p, "s", "supervisor extension");
+-
+-  if (p == NULL)
+-    return FALSE;
++  /* Parse the different classes of extensions in the specified order.  */
+ 
+-  /* Parsing non-standard supervisor extension.  */
+-  p = riscv_parse_sv_or_non_std_ext (
+-	rps, arch, p, "sx", "non-standard supervisor extension");
++  for (size_t i = 0; i < ARRAY_SIZE (parse_config); ++i) {
++    p = riscv_parse_prefixed_ext (rps, arch, p, &parse_config[i]);
+ 
+-  if (p == NULL)
+-    return FALSE;
++    if (p == NULL)
++      return FALSE;
++  }
+ 
+   if (*p != '\0')
+     {
+diff --git a/bfd/elfxx-riscv.h b/bfd/elfxx-riscv.h
+index 19f7bd2ecc..fc0e262447 100644
+--- a/bfd/elfxx-riscv.h
++++ b/bfd/elfxx-riscv.h
+@@ -86,3 +86,23 @@ riscv_release_subset_list (riscv_subset_list_t *);
+ 
+ extern char *
+ riscv_arch_str (unsigned, const riscv_subset_list_t *);
++
++extern const char * const z_ext_strtab[];
++extern const char * const riscv_std_s_ext_strtab[];
++
++/* ISA extension name class. E.g. "zbb" corresponds to RV_ISA_CLASS_Z,
++   "xargs" corresponds to RV_ISA_CLASS_X, etc.
++   Order is important here!*/
++
++typedef enum riscv_isa_ext_class
++  {
++   RV_ISA_CLASS_S,
++   RV_ISA_CLASS_Z,
++   RV_ISA_CLASS_X,
++   RV_ISA_CLASS_UNKNOWN
++  } riscv_isa_ext_class_t;
++
++/* Classify the argument 'ext' into one of riscv_isa_ext_class_t.  */
++
++riscv_isa_ext_class_t
++riscv_get_prefix_class (const char *ext);
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index e50505138e..9ecdcab0b6 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -131,14 +131,48 @@ riscv_multi_subset_supports (enum riscv_insn_class insn_class)
+     case INSN_CLASS_M: return riscv_subset_supports ("m");
+     case INSN_CLASS_F: return riscv_subset_supports ("f");
+     case INSN_CLASS_D: return riscv_subset_supports ("d");
++
+     case INSN_CLASS_D_AND_C:
+       return riscv_subset_supports ("d") && riscv_subset_supports ("c");
+-
+     case INSN_CLASS_F_AND_C:
+       return riscv_subset_supports ("f") && riscv_subset_supports ("c");
+ 
+     case INSN_CLASS_Q: return riscv_subset_supports ("q");
+ 
++    case INSN_CLASS_B_OR_ZBB:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbb");
++
++    case INSN_CLASS_B_OR_ZBA:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zba");
++
++    case INSN_CLASS_B_OR_ZBC:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbc");
++
++    case INSN_CLASS_B_OR_ZBE:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbe");
++
++    case INSN_CLASS_B_OR_ZBF:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbf");
++
++    case INSN_CLASS_B_OR_ZBM:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbm");
++
++    case INSN_CLASS_B_OR_ZBP:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbp");
++
++    case INSN_CLASS_B_OR_ZBR:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbr");
++
++    case INSN_CLASS_B_OR_ZBS:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbs");
++
++    case INSN_CLASS_B_OR_ZBT:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbt");
++
++    case INSN_CLASS_B_OR_ZBB_OR_ZBP:
++      return riscv_subset_supports ("b") || riscv_subset_supports ("zbb")
++	|| riscv_subset_supports ("zbp");
++
+     default:
+       as_fatal ("Unreachable");
+       return FALSE;
+@@ -636,6 +670,7 @@ validate_riscv_insn (const struct riscv_opcode *opc, int length)
+       case '(': break;
+       case ')': break;
+       case '<': USE_BITS (OP_MASK_SHAMTW,	OP_SH_SHAMTW);	break;
++      case '|': USE_BITS (OP_MASK_SHAMTW,	OP_SH_SHAMTW);	break;
+       case '>':	USE_BITS (OP_MASK_SHAMT,	OP_SH_SHAMT);	break;
+       case 'A': break;
+       case 'D':	USE_BITS (OP_MASK_RD,		OP_SH_RD);	break;
+@@ -915,6 +950,15 @@ macro_build (expressionS *ep, const char *name, const char *fmt, ...)
+ 	  INSERT_OPERAND (RS2, insn, va_arg (args, int));
+ 	  continue;
+ 
++	case 'r':
++	  INSERT_OPERAND (RS3, insn, va_arg (args, int));
++	  continue;
++
++	case '<':
++	case '|':
++	  INSERT_OPERAND (SHAMTW, insn, va_arg (args, int));
++	  continue;
++
+ 	case '>':
+ 	  INSERT_OPERAND (SHAMT, insn, va_arg (args, int));
+ 	  continue;
+@@ -1094,6 +1138,86 @@ load_const (int reg, expressionS *ep)
+     }
+ }
+ 
++/* Immediate rotate left shift via right shift.  */
++
++static void
++rotate_left (int rd, int rs, unsigned shamt, unsigned this_xlen)
++{
++  shamt = (this_xlen-1) & -shamt;
++
++  if (this_xlen == xlen)
++    macro_build (NULL, "rori", "d,s,>", rd, rs, shamt);
++  else if (this_xlen == 32)
++    macro_build (NULL, "roriw", "d,s,<", rd, rs, shamt);
++  else
++    as_fatal (_("internal error: bad left shift xlen %d"), this_xlen);
++}
++
++static void
++funnel_left (int rd, int rs1, int rs3, unsigned shamt, unsigned this_xlen)
++{
++  shamt = (this_xlen-1) & -shamt;
++
++  if (this_xlen == xlen)
++    macro_build (NULL, "fsri", "d,s,r,>", rd, rs3, rs1, shamt);
++  else if (this_xlen == 32)
++    macro_build (NULL, "fsriw", "d,s,r,<", rd, rs3, rs1, shamt);
++  else
++    as_fatal (_("internal error: bad left shift xlen %d"), this_xlen);
++}
++
++static void
++perm (int rd, int rs1, const char *op)
++{
++  const char *insn = NULL;
++  const char *p = op;
++  int shamt = 0;
++  int shfl = 0;
++
++  switch (p[0])
++    {
++    case 'r': insn = "grevi";   shamt = xlen-1;   p += 3; break;
++    case 'o': insn = "gorci";   shamt = xlen-1;   p += 3; break;
++    case 'z': insn = "shfli";   shamt = xlen/2-1; p += 3; shfl = 1; break;
++    case 'u': insn = "unshfli"; shamt = xlen/2-1; p += 5; shfl = 1; break;
++    default: as_fatal (_("internal error: bad permutation pseudo-instruction %s"), op);
++    }
++
++  switch (p[0])
++    {
++    case '2': shamt &= shamt << 1; p += 1; break;
++    case '4': shamt &= shamt << 2; p += 1; break;
++    case '8': shamt &= shamt << 3; p += 1; break;
++    case '1': shamt &= shamt << 4; p += 2; break;
++    case '3': shamt &= shamt << 5; p += 2;
++    }
++
++  if (p[0])
++    {
++      if (shfl)
++        switch (p[1])
++          {
++          case 'w': shamt &= 15; break;
++          case 'h': shamt &=  7; break;
++          case 'b': shamt &=  3; break;
++          case 'n': shamt &=  1; break;
++          default: as_fatal (_("internal error: bad permutation pseudo-instruction %s"), op);
++          }
++      else
++        switch (p[1])
++          {
++          case 'w': shamt &= 31; break;
++          case 'h': shamt &= 15; break;
++          case 'b': shamt &=  7; break;
++          case 'n': shamt &=  3; break;
++          case 'p': shamt &=  1; break;
++          default: as_fatal (_("internal error: bad permutation pseudo-instruction %s"), op);
++          }
++    }
++
++  macro_build (NULL, insn, "d,s,>", rd, rs1, shamt);
++}
++
+ /* Expand RISC-V assembly macros into one or more instructions.  */
+ static void
+ macro (struct riscv_cl_insn *ip, expressionS *imm_expr,
+@@ -1102,6 +1226,8 @@ macro (struct riscv_cl_insn *ip, expressionS *imm_expr,
+   int rd = (ip->insn_opcode >> OP_SH_RD) & OP_MASK_RD;
+   int rs1 = (ip->insn_opcode >> OP_SH_RS1) & OP_MASK_RS1;
+   int rs2 = (ip->insn_opcode >> OP_SH_RS2) & OP_MASK_RS2;
++  int rs3 = (ip->insn_opcode >> OP_SH_RS3) & OP_MASK_RS3;
++  int shamt = (ip->insn_opcode >> OP_SH_SHAMT) & OP_MASK_SHAMT;
+   int mask = ip->insn_mo->mask;
+ 
+   switch (mask)
+@@ -1110,6 +1236,18 @@ macro (struct riscv_cl_insn *ip, expressionS *imm_expr,
+       load_const (rd, imm_expr);
+       break;
+ 
++    case M_RL:
++      rotate_left (rd, rs1, shamt, ip->insn_mo->xlen_requirement ? ip->insn_mo->xlen_requirement/2 : xlen);
++      break;
++
++    case M_FL:
++      funnel_left (rd, rs1, rs3, shamt, ip->insn_mo->xlen_requirement ? ip->insn_mo->xlen_requirement/2 : xlen);
++      break;
++
++    case M_PERM:
++      perm (rd, rs1, ip->insn_mo->name);
++      break;
++
+     case M_LA:
+     case M_LLA:
+       /* Load the address of a symbol into a register.  */
+@@ -1793,6 +1931,17 @@ rvc_lui:
+ 	      s = expr_end;
+ 	      continue;
+ 
++	    case '|':		/* Shift amount, 0 - (XLEN/2-1).  */
++	      my_getExpression (imm_expr, s);
++	      check_absolute_expr (ip, imm_expr, FALSE);
++	      if ((unsigned long) imm_expr->X_add_number >= xlen/2)
++		as_bad (_("Improper shift amount (%lu)"),
++			(unsigned long) imm_expr->X_add_number);
++	      INSERT_OPERAND (SHAMTW, *ip, imm_expr->X_add_number);
++	      imm_expr->X_op = O_absent;
++	      s = expr_end;
++	      continue;
++
+ 	    case '>':		/* Shift amount, 0 - (XLEN-1).  */
+ 	      my_getExpression (imm_expr, s);
+ 	      check_absolute_expr (ip, imm_expr, FALSE);
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index f09200c073..6c750a33b1 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -169,6 +169,218 @@
+ #define MASK_REMW  0xfe00707f
+ #define MATCH_REMUW 0x200703b
+ #define MASK_REMUW  0xfe00707f
++#define MATCH_ANDN 0x40007033
++#define MASK_ANDN  0xfe00707f
++#define MATCH_ORN 0x40006033
++#define MASK_ORN  0xfe00707f
++#define MATCH_XNOR 0x40004033
++#define MASK_XNOR  0xfe00707f
++#define MATCH_SLO 0x20001033
++#define MASK_SLO  0xfe00707f
++#define MATCH_SRO 0x20005033
++#define MASK_SRO  0xfe00707f
++#define MATCH_ROL 0x60001033
++#define MASK_ROL  0xfe00707f
++#define MATCH_ROR 0x60005033
++#define MASK_ROR  0xfe00707f
++#define MATCH_SBCLR 0x48001033
++#define MASK_SBCLR  0xfe00707f
++#define MATCH_SBSET 0x28001033
++#define MASK_SBSET  0xfe00707f
++#define MATCH_SBINV 0x68001033
++#define MASK_SBINV  0xfe00707f
++#define MATCH_SBEXT 0x48005033
++#define MASK_SBEXT  0xfe00707f
++#define MATCH_GORC 0x28005033
++#define MASK_GORC  0xfe00707f
++#define MATCH_GREV 0x68005033
++#define MASK_GREV  0xfe00707f
++#define MATCH_SLOI 0x20001013
++#define MASK_SLOI  0xfc00707f
++#define MATCH_SROI 0x20005013
++#define MASK_SROI  0xfc00707f
++#define MATCH_RORI 0x60005013
++#define MASK_RORI  0xfc00707f
++#define MATCH_SBCLRI 0x48001013
++#define MASK_SBCLRI  0xfc00707f
++#define MATCH_SBSETI 0x28001013
++#define MASK_SBSETI  0xfc00707f
++#define MATCH_SBINVI 0x68001013
++#define MASK_SBINVI  0xfc00707f
++#define MATCH_SBEXTI 0x48005013
++#define MASK_SBEXTI  0xfc00707f
++#define MATCH_GORCI 0x28005013
++#define MASK_GORCI  0xfc00707f
++#define MATCH_GREVI 0x68005013
++#define MASK_GREVI  0xfc00707f
++#define MATCH_CMIX 0x6001033
++#define MASK_CMIX  0x600707f
++#define MATCH_CMOV 0x6005033
++#define MASK_CMOV  0x600707f
++#define MATCH_FSL 0x4001033
++#define MASK_FSL  0x600707f
++#define MATCH_FSR 0x4005033
++#define MASK_FSR  0x600707f
++#define MATCH_FSRI 0x4005013
++#define MASK_FSRI  0x400707f
++#define MATCH_CLZ 0x60001013
++#define MASK_CLZ  0xfff0707f
++#define MATCH_CTZ 0x60101013
++#define MASK_CTZ  0xfff0707f
++#define MATCH_PCNT 0x60201013
++#define MASK_PCNT  0xfff0707f
++#define MATCH_SEXT_B 0x60401013
++#define MASK_SEXT_B  0xfff0707f
++#define MATCH_SEXT_H 0x60501013
++#define MASK_SEXT_H  0xfff0707f
++#define MATCH_CRC32_B 0x61001013
++#define MASK_CRC32_B  0xfff0707f
++#define MATCH_CRC32_H 0x61101013
++#define MASK_CRC32_H  0xfff0707f
++#define MATCH_CRC32_W 0x61201013
++#define MASK_CRC32_W  0xfff0707f
++#define MATCH_CRC32C_B 0x61801013
++#define MASK_CRC32C_B  0xfff0707f
++#define MATCH_CRC32C_H 0x61901013
++#define MASK_CRC32C_H  0xfff0707f
++#define MATCH_CRC32C_W 0x61a01013
++#define MASK_CRC32C_W  0xfff0707f
++#define MATCH_SH1ADD 0x20002033
++#define MASK_SH1ADD  0xfe00707f
++#define MATCH_SH2ADD 0x20004033
++#define MASK_SH2ADD  0xfe00707f
++#define MATCH_SH3ADD 0x20006033
++#define MASK_SH3ADD  0xfe00707f
++#define MATCH_CLMUL 0xa001033
++#define MASK_CLMUL  0xfe00707f
++#define MATCH_CLMULR 0xa002033
++#define MASK_CLMULR  0xfe00707f
++#define MATCH_CLMULH 0xa003033
++#define MASK_CLMULH  0xfe00707f
++#define MATCH_MIN 0xa004033
++#define MASK_MIN  0xfe00707f
++#define MATCH_MAX 0xa005033
++#define MASK_MAX  0xfe00707f
++#define MATCH_MINU 0xa006033
++#define MASK_MINU  0xfe00707f
++#define MATCH_MAXU 0xa007033
++#define MASK_MAXU  0xfe00707f
++#define MATCH_SHFL 0x8001033
++#define MASK_SHFL  0xfe00707f
++#define MATCH_UNSHFL 0x8005033
++#define MASK_UNSHFL  0xfe00707f
++#define MATCH_BEXT 0x8006033
++#define MASK_BEXT  0xfe00707f
++#define MATCH_BDEP 0x48006033
++#define MASK_BDEP  0xfe00707f
++#define MATCH_PACK 0x8004033
++#define MASK_PACK  0xfe00707f
++#define MATCH_PACKU 0x48004033
++#define MASK_PACKU  0xfe00707f
++#define MATCH_PACKH 0x8007033
++#define MASK_PACKH  0xfe00707f
++#define MATCH_BFP 0x48007033
++#define MASK_BFP  0xfe00707f
++#define MATCH_SHFLI 0x8001013
++#define MASK_SHFLI  0xfe00707f
++#define MATCH_UNSHFLI 0x8005013
++#define MASK_UNSHFLI  0xfe00707f
++#define MATCH_BMATFLIP 0x60301013
++#define MASK_BMATFLIP  0xfff0707f
++#define MATCH_CRC32_D 0x61301013
++#define MASK_CRC32_D  0xfff0707f
++#define MATCH_CRC32C_D 0x61b01013
++#define MASK_CRC32C_D  0xfff0707f
++#define MATCH_BMATOR 0x8003033
++#define MASK_BMATOR  0xfe00707f
++#define MATCH_BMATXOR 0x48003033
++#define MASK_BMATXOR  0xfe00707f
++#define MATCH_ADDIWU 0x401b
++#define MASK_ADDIWU  0x707f
++#define MATCH_SLLIU_W 0x800101b
++#define MASK_SLLIU_W  0xfc00707f
++#define MATCH_ADDWU 0xa00003b
++#define MASK_ADDWU  0xfe00707f
++#define MATCH_SUBWU 0x4a00003b
++#define MASK_SUBWU  0xfe00707f
++#define MATCH_ADDU_W 0x800003b
++#define MASK_ADDU_W  0xfe00707f
++#define MATCH_SUBU_W 0x4800003b
++#define MASK_SUBU_W  0xfe00707f
++#define MATCH_SLOW 0x2000103b
++#define MASK_SLOW  0xfe00707f
++#define MATCH_SROW 0x2000503b
++#define MASK_SROW  0xfe00707f
++#define MATCH_ROLW 0x6000103b
++#define MASK_ROLW  0xfe00707f
++#define MATCH_RORW 0x6000503b
++#define MASK_RORW  0xfe00707f
++#define MATCH_SBCLRW 0x4800103b
++#define MASK_SBCLRW  0xfe00707f
++#define MATCH_SBSETW 0x2800103b
++#define MASK_SBSETW  0xfe00707f
++#define MATCH_SBINVW 0x6800103b
++#define MASK_SBINVW  0xfe00707f
++#define MATCH_SBEXTW 0x4800503b
++#define MASK_SBEXTW  0xfe00707f
++#define MATCH_GORCW 0x2800503b
++#define MASK_GORCW  0xfe00707f
++#define MATCH_GREVW 0x6800503b
++#define MASK_GREVW  0xfe00707f
++#define MATCH_SLOIW 0x2000101b
++#define MASK_SLOIW  0xfe00707f
++#define MATCH_SROIW 0x2000501b
++#define MASK_SROIW  0xfe00707f
++#define MATCH_RORIW 0x6000501b
++#define MASK_RORIW  0xfe00707f
++#define MATCH_SBCLRIW 0x4800101b
++#define MASK_SBCLRIW  0xfe00707f
++#define MATCH_SBSETIW 0x2800101b
++#define MASK_SBSETIW  0xfe00707f
++#define MATCH_SBINVIW 0x6800101b
++#define MASK_SBINVIW  0xfe00707f
++#define MATCH_GORCIW 0x2800501b
++#define MASK_GORCIW  0xfe00707f
++#define MATCH_GREVIW 0x6800501b
++#define MASK_GREVIW  0xfe00707f
++#define MATCH_FSLW 0x400103b
++#define MASK_FSLW  0x600707f
++#define MATCH_FSRW 0x400503b
++#define MASK_FSRW  0x600707f
++#define MATCH_FSRIW 0x400501b
++#define MASK_FSRIW  0x600707f
++#define MATCH_CLZW 0x6000101b
++#define MASK_CLZW  0xfff0707f
++#define MATCH_CTZW 0x6010101b
++#define MASK_CTZW  0xfff0707f
++#define MATCH_PCNTW 0x6020101b
++#define MASK_PCNTW  0xfff0707f
++#define MATCH_SH1ADDU_W 0x2000203b
++#define MASK_SH1ADDU_W  0xfe00707f
++#define MATCH_SH2ADDU_W 0x2000403b
++#define MASK_SH2ADDU_W  0xfe00707f
++#define MATCH_SH3ADDU_W 0x2000603b
++#define MASK_SH3ADDU_W  0xfe00707f
++#define MATCH_CLMULW 0xa00103b
++#define MASK_CLMULW  0xfe00707f
++#define MATCH_CLMULRW 0xa00203b
++#define MASK_CLMULRW  0xfe00707f
++#define MATCH_CLMULHW 0xa00303b
++#define MASK_CLMULHW  0xfe00707f
++#define MATCH_SHFLW 0x800103b
++#define MASK_SHFLW  0xfe00707f
++#define MATCH_UNSHFLW 0x800503b
++#define MASK_UNSHFLW  0xfe00707f
++#define MATCH_BEXTW 0x800603b
++#define MASK_BEXTW  0xfe00707f
++#define MATCH_BDEPW 0x4800603b
++#define MASK_BDEPW  0xfe00707f
++#define MATCH_PACKW 0x800403b
++#define MASK_PACKW  0xfe00707f
++#define MATCH_PACKUW 0x4800403b
++#define MASK_PACKUW  0xfe00707f
++#define MATCH_BFPW 0x4800703b
++#define MASK_BFPW  0xfe00707f
+ #define MATCH_AMOADD_W 0x202f
+ #define MASK_AMOADD_W  0xf800707f
+ #define MATCH_AMOXOR_W 0x2000202f
+@@ -914,6 +1126,112 @@ DECLARE_INSN(divw, MATCH_DIVW, MASK_DIVW)
+ DECLARE_INSN(divuw, MATCH_DIVUW, MASK_DIVUW)
+ DECLARE_INSN(remw, MATCH_REMW, MASK_REMW)
+ DECLARE_INSN(remuw, MATCH_REMUW, MASK_REMUW)
++DECLARE_INSN(andn, MATCH_ANDN, MASK_ANDN)
++DECLARE_INSN(orn, MATCH_ORN, MASK_ORN)
++DECLARE_INSN(xnor, MATCH_XNOR, MASK_XNOR)
++DECLARE_INSN(slo, MATCH_SLO, MASK_SLO)
++DECLARE_INSN(sro, MATCH_SRO, MASK_SRO)
++DECLARE_INSN(rol, MATCH_ROL, MASK_ROL)
++DECLARE_INSN(ror, MATCH_ROR, MASK_ROR)
++DECLARE_INSN(sbclr, MATCH_SBCLR, MASK_SBCLR)
++DECLARE_INSN(sbset, MATCH_SBSET, MASK_SBSET)
++DECLARE_INSN(sbinv, MATCH_SBINV, MASK_SBINV)
++DECLARE_INSN(sbext, MATCH_SBEXT, MASK_SBEXT)
++DECLARE_INSN(gorc, MATCH_GORC, MASK_GORC)
++DECLARE_INSN(grev, MATCH_GREV, MASK_GREV)
++DECLARE_INSN(sloi, MATCH_SLOI, MASK_SLOI)
++DECLARE_INSN(sroi, MATCH_SROI, MASK_SROI)
++DECLARE_INSN(rori, MATCH_RORI, MASK_RORI)
++DECLARE_INSN(sbclri, MATCH_SBCLRI, MASK_SBCLRI)
++DECLARE_INSN(sbseti, MATCH_SBSETI, MASK_SBSETI)
++DECLARE_INSN(sbinvi, MATCH_SBINVI, MASK_SBINVI)
++DECLARE_INSN(sbexti, MATCH_SBEXTI, MASK_SBEXTI)
++DECLARE_INSN(gorci, MATCH_GORCI, MASK_GORCI)
++DECLARE_INSN(grevi, MATCH_GREVI, MASK_GREVI)
++DECLARE_INSN(cmix, MATCH_CMIX, MASK_CMIX)
++DECLARE_INSN(cmov, MATCH_CMOV, MASK_CMOV)
++DECLARE_INSN(fsl, MATCH_FSL, MASK_FSL)
++DECLARE_INSN(fsr, MATCH_FSR, MASK_FSR)
++DECLARE_INSN(fsri, MATCH_FSRI, MASK_FSRI)
++DECLARE_INSN(clz, MATCH_CLZ, MASK_CLZ)
++DECLARE_INSN(ctz, MATCH_CTZ, MASK_CTZ)
++DECLARE_INSN(pcnt, MATCH_PCNT, MASK_PCNT)
++DECLARE_INSN(sext_b, MATCH_SEXT_B, MASK_SEXT_B)
++DECLARE_INSN(sext_h, MATCH_SEXT_H, MASK_SEXT_H)
++DECLARE_INSN(crc32_b, MATCH_CRC32_B, MASK_CRC32_B)
++DECLARE_INSN(crc32_h, MATCH_CRC32_H, MASK_CRC32_H)
++DECLARE_INSN(crc32_w, MATCH_CRC32_W, MASK_CRC32_W)
++DECLARE_INSN(crc32c_b, MATCH_CRC32C_B, MASK_CRC32C_B)
++DECLARE_INSN(crc32c_h, MATCH_CRC32C_H, MASK_CRC32C_H)
++DECLARE_INSN(crc32c_w, MATCH_CRC32C_W, MASK_CRC32C_W)
++DECLARE_INSN(sh1add, MATCH_SH1ADD, MASK_SH1ADD)
++DECLARE_INSN(sh2add, MATCH_SH2ADD, MASK_SH2ADD)
++DECLARE_INSN(sh3add, MATCH_SH3ADD, MASK_SH3ADD)
++DECLARE_INSN(clmul, MATCH_CLMUL, MASK_CLMUL)
++DECLARE_INSN(clmulr, MATCH_CLMULR, MASK_CLMULR)
++DECLARE_INSN(clmulh, MATCH_CLMULH, MASK_CLMULH)
++DECLARE_INSN(min, MATCH_MIN, MASK_MIN)
++DECLARE_INSN(max, MATCH_MAX, MASK_MAX)
++DECLARE_INSN(minu, MATCH_MINU, MASK_MINU)
++DECLARE_INSN(maxu, MATCH_MAXU, MASK_MAXU)
++DECLARE_INSN(shfl, MATCH_SHFL, MASK_SHFL)
++DECLARE_INSN(unshfl, MATCH_UNSHFL, MASK_UNSHFL)
++DECLARE_INSN(bext, MATCH_BEXT, MASK_BEXT)
++DECLARE_INSN(bdep, MATCH_BDEP, MASK_BDEP)
++DECLARE_INSN(pack, MATCH_PACK, MASK_PACK)
++DECLARE_INSN(packu, MATCH_PACKU, MASK_PACKU)
++DECLARE_INSN(packh, MATCH_PACKH, MASK_PACKH)
++DECLARE_INSN(bfp, MATCH_BFP, MASK_BFP)
++DECLARE_INSN(shfli, MATCH_SHFLI, MASK_SHFLI)
++DECLARE_INSN(unshfli, MATCH_UNSHFLI, MASK_UNSHFLI)
++DECLARE_INSN(bmatflip, MATCH_BMATFLIP, MASK_BMATFLIP)
++DECLARE_INSN(crc32_d, MATCH_CRC32_D, MASK_CRC32_D)
++DECLARE_INSN(crc32c_d, MATCH_CRC32C_D, MASK_CRC32C_D)
++DECLARE_INSN(bmator, MATCH_BMATOR, MASK_BMATOR)
++DECLARE_INSN(bmatxor, MATCH_BMATXOR, MASK_BMATXOR)
++DECLARE_INSN(addiwu, MATCH_ADDIWU, MASK_ADDIWU)
++DECLARE_INSN(slliu_w, MATCH_SLLIU_W, MASK_SLLIU_W)
++DECLARE_INSN(addwu, MATCH_ADDWU, MASK_ADDWU)
++DECLARE_INSN(subwu, MATCH_SUBWU, MASK_SUBWU)
++DECLARE_INSN(addu_w, MATCH_ADDU_W, MASK_ADDU_W)
++DECLARE_INSN(subu_w, MATCH_SUBU_W, MASK_SUBU_W)
++DECLARE_INSN(slow, MATCH_SLOW, MASK_SLOW)
++DECLARE_INSN(srow, MATCH_SROW, MASK_SROW)
++DECLARE_INSN(rolw, MATCH_ROLW, MASK_ROLW)
++DECLARE_INSN(rorw, MATCH_RORW, MASK_RORW)
++DECLARE_INSN(sbclrw, MATCH_SBCLRW, MASK_SBCLRW)
++DECLARE_INSN(sbsetw, MATCH_SBSETW, MASK_SBSETW)
++DECLARE_INSN(sbinvw, MATCH_SBINVW, MASK_SBINVW)
++DECLARE_INSN(sbextw, MATCH_SBEXTW, MASK_SBEXTW)
++DECLARE_INSN(gorcw, MATCH_GORCW, MASK_GORCW)
++DECLARE_INSN(grevw, MATCH_GREVW, MASK_GREVW)
++DECLARE_INSN(sloiw, MATCH_SLOIW, MASK_SLOIW)
++DECLARE_INSN(sroiw, MATCH_SROIW, MASK_SROIW)
++DECLARE_INSN(roriw, MATCH_RORIW, MASK_RORIW)
++DECLARE_INSN(sbclriw, MATCH_SBCLRIW, MASK_SBCLRIW)
++DECLARE_INSN(sbsetiw, MATCH_SBSETIW, MASK_SBSETIW)
++DECLARE_INSN(sbinviw, MATCH_SBINVIW, MASK_SBINVIW)
++DECLARE_INSN(gorciw, MATCH_GORCIW, MASK_GORCIW)
++DECLARE_INSN(greviw, MATCH_GREVIW, MASK_GREVIW)
++DECLARE_INSN(fslw, MATCH_FSLW, MASK_FSLW)
++DECLARE_INSN(fsrw, MATCH_FSRW, MASK_FSRW)
++DECLARE_INSN(fsriw, MATCH_FSRIW, MASK_FSRIW)
++DECLARE_INSN(clzw, MATCH_CLZW, MASK_CLZW)
++DECLARE_INSN(ctzw, MATCH_CTZW, MASK_CTZW)
++DECLARE_INSN(pcntw, MATCH_PCNTW, MASK_PCNTW)
++DECLARE_INSN(sh1addu_w, MATCH_SH1ADDU_W, MASK_SH1ADDU_W)
++DECLARE_INSN(sh2addu_w, MATCH_SH2ADDU_W, MASK_SH2ADDU_W)
++DECLARE_INSN(sh3addu_w, MATCH_SH3ADDU_W, MASK_SH3ADDU_W)
++DECLARE_INSN(clmulw, MATCH_CLMULW, MASK_CLMULW)
++DECLARE_INSN(clmulrw, MATCH_CLMULRW, MASK_CLMULRW)
++DECLARE_INSN(clmulhw, MATCH_CLMULHW, MASK_CLMULHW)
++DECLARE_INSN(shflw, MATCH_SHFLW, MASK_SHFLW)
++DECLARE_INSN(unshflw, MATCH_UNSHFLW, MASK_UNSHFLW)
++DECLARE_INSN(bextw, MATCH_BEXTW, MASK_BEXTW)
++DECLARE_INSN(bdepw, MATCH_BDEPW, MASK_BDEPW)
++DECLARE_INSN(packw, MATCH_PACKW, MASK_PACKW)
++DECLARE_INSN(packuw, MATCH_PACKUW, MASK_PACKUW)
++DECLARE_INSN(bfpw, MATCH_BFPW, MASK_BFPW)
+ DECLARE_INSN(amoadd_w, MATCH_AMOADD_W, MASK_AMOADD_W)
+ DECLARE_INSN(amoxor_w, MATCH_AMOXOR_W, MASK_AMOXOR_W)
+ DECLARE_INSN(amoor_w, MATCH_AMOOR_W, MASK_AMOOR_W)
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index bfb96c86b6..7e67c7f9a2 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -309,6 +309,19 @@ enum riscv_insn_class
+    INSN_CLASS_D_AND_C,
+    INSN_CLASS_F_AND_C,
+    INSN_CLASS_Q,
++
++   INSN_CLASS_B,
++   INSN_CLASS_B_OR_ZBT,
++   INSN_CLASS_B_OR_ZBR,
++   INSN_CLASS_B_OR_ZBB,
++   INSN_CLASS_B_OR_ZBA,
++   INSN_CLASS_B_OR_ZBC,
++   INSN_CLASS_B_OR_ZBE,
++   INSN_CLASS_B_OR_ZBF,
++   INSN_CLASS_B_OR_ZBM,
++   INSN_CLASS_B_OR_ZBP,
++   INSN_CLASS_B_OR_ZBS,
++   INSN_CLASS_B_OR_ZBB_OR_ZBP
+   };
+ 
+ /* This structure holds information for a particular instruction.  */
+@@ -409,6 +422,9 @@ enum
+   M_CALL,
+   M_J,
+   M_LI,
++  M_RL,
++  M_FL,
++  M_PERM,
+   M_NUM_MACROS
+ };
+ 
+diff --git a/ld/testsuite/ld-riscv-elf/attr-dupl-arch-z-failed-01.d b/ld/testsuite/ld-riscv-elf/attr-dupl-arch-z-failed-01.d
+new file mode 100644
+index 0000000000..20b4530f0a
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-dupl-arch-z-failed-01.d
+@@ -0,0 +1,3 @@
++#source: attr-dupl-arch-z-failed-01.s
++#as: -march-attr
++#error: -march=rv32i2p0_zbc_zbc: Duplicate Z ISA extension: 'zbc'
+diff --git a/ld/testsuite/ld-riscv-elf/attr-dupl-arch-z-failed-01.s b/ld/testsuite/ld-riscv-elf/attr-dupl-arch-z-failed-01.s
+new file mode 100644
+index 0000000000..96d67e1833
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-dupl-arch-z-failed-01.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_zbc_zbc"
+diff --git a/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01.d b/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01.d
+new file mode 100644
+index 0000000000..d82c1c2868
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01.d
+@@ -0,0 +1,5 @@
++#source: attr-merge-arch-z-failed-01a.s
++#source: attr-merge-arch-z-failed-01b.s
++#as: -march-attr
++#ld: -r -melf32lriscv
++#error: Mis-matched ISA version for 'zbb' extension. 2.1 vs 2.0
+diff --git a/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01a.s b/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01a.s
+new file mode 100644
+index 0000000000..6768e78c52
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01a.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_zbb2p0"
+diff --git a/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01b.s b/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01b.s
+new file mode 100644
+index 0000000000..4279973411
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-merge-arch-z-failed-01b.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_zbb2p1"
+diff --git a/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-01.d b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-01.d
+new file mode 100644
+index 0000000000..809d8ba607
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-01.d
+@@ -0,0 +1,3 @@
++#source: attr-order-arch-z-failed-01.s
++#as: -march-attr
++#error: -march=rv32i2p0_zbc_zbb: Z ISA extension not in alphabetical order: 'zbb' must come before 'zbc'.
+diff --git a/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-01.s b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-01.s
+new file mode 100644
+index 0000000000..e31e3766ca
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-01.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_zbc_zbb"
+diff --git a/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-02.d b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-02.d
+new file mode 100644
+index 0000000000..19a5482300
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-02.d
+@@ -0,0 +1,3 @@
++#source: attr-order-arch-z-failed-02.s
++#as: -march-attr
++#error: -march=rv32i2p0_xsillyname_zbb: unexpected ISA string at end: zbb
+diff --git a/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-02.s b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-02.s
+new file mode 100644
+index 0000000000..b1abe26891
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-order-arch-z-failed-02.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_xsillyname_zbb"
+diff --git a/ld/testsuite/ld-riscv-elf/attr-tooshort-arch-z-failed-01.d b/ld/testsuite/ld-riscv-elf/attr-tooshort-arch-z-failed-01.d
+new file mode 100644
+index 0000000000..4a6885db5e
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-tooshort-arch-z-failed-01.d
+@@ -0,0 +1,3 @@
++#source: attr-tooshort-arch-z-failed-01.s
++#as: -march-attr
++#error: -march=rv32i2p0_z: Literal 'z' is an invalid Z ISA extension specifier.
+diff --git a/ld/testsuite/ld-riscv-elf/attr-tooshort-arch-z-failed-01.s b/ld/testsuite/ld-riscv-elf/attr-tooshort-arch-z-failed-01.s
+new file mode 100644
+index 0000000000..7ca87fabf4
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-tooshort-arch-z-failed-01.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_z"
+diff --git a/ld/testsuite/ld-riscv-elf/attr-unknown-arch-z-failed-01.d b/ld/testsuite/ld-riscv-elf/attr-unknown-arch-z-failed-01.d
+new file mode 100644
+index 0000000000..343db87a41
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-unknown-arch-z-failed-01.d
+@@ -0,0 +1,3 @@
++#source: attr-unknown-arch-z-failed-01.s
++#as: -march-attr
++#error: -march=rv32i2p0_zsillyname: Unknown Z ISA extension: 'zsillyname'
+diff --git a/ld/testsuite/ld-riscv-elf/attr-unknown-arch-z-failed-01.s b/ld/testsuite/ld-riscv-elf/attr-unknown-arch-z-failed-01.s
+new file mode 100644
+index 0000000000..6e16bef91d
+--- /dev/null
++++ b/ld/testsuite/ld-riscv-elf/attr-unknown-arch-z-failed-01.s
+@@ -0,0 +1 @@
++	.attribute arch, "rv32i2p0_zsillyname"
+diff --git a/ld/testsuite/ld-riscv-elf/ld-riscv-elf.exp b/ld/testsuite/ld-riscv-elf/ld-riscv-elf.exp
+index c994a57c48..b4fe5a4fca 100644
+--- a/ld/testsuite/ld-riscv-elf/ld-riscv-elf.exp
++++ b/ld/testsuite/ld-riscv-elf/ld-riscv-elf.exp
+@@ -37,6 +37,12 @@ if [istarget "riscv*-*-*"] {
+     run_dump_test "attr-merge-priv-spec"
+     run_dump_test "attr-merge-arch-failed-01"
+     run_dump_test "attr-merge-stack-align-failed"
++    run_dump_test "attr-merge-arch-z-failed-01"
++    run_dump_test "attr-dupl-arch-z-failed-01"
++    run_dump_test "attr-order-arch-z-failed-01"
++    run_dump_test "attr-order-arch-z-failed-02"
++    run_dump_test "attr-tooshort-arch-z-failed-01"
++    run_dump_test "attr-unknown-arch-z-failed-01"
+     run_ld_link_tests {
+ 	{ "Weak reference 32" "-T weakref.ld -melf32lriscv" ""
+ 	    "-march=rv32i -mabi=ilp32" {weakref32.s}
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 40893c3dcb..19f10c0e55 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -196,6 +196,7 @@ print_insn_args (const char *d, insn_t l, bfd_vma pc, disassemble_info *info)
+ 	    case '>':
+ 	      print (info->stream, "0x%x", (int)EXTRACT_RVC_IMM (l) & 0x3f);
+ 	      break;
++	    case '|':
+ 	    case '<':
+ 	      print (info->stream, "0x%x", (int)EXTRACT_RVC_IMM (l) & 0x1f);
+ 	      break;
+@@ -236,6 +237,11 @@ print_insn_args (const char *d, insn_t l, bfd_vma pc, disassemble_info *info)
+ 		 riscv_gpr_names[EXTRACT_OPERAND (RS2, l)]);
+ 	  break;
+ 
++	case 'r':
++	  print (info->stream, "%s",
++		 riscv_gpr_names[EXTRACT_OPERAND (RS3, l)]);
++	  break;
++
+ 	case 'u':
+ 	  print (info->stream, "0x%x",
+ 		 (unsigned)EXTRACT_UTYPE_IMM (l) >> RISCV_IMM_BITS);
+@@ -299,6 +305,7 @@ print_insn_args (const char *d, insn_t l, bfd_vma pc, disassemble_info *info)
+ 	  print (info->stream, "0x%x", (int)EXTRACT_OPERAND (SHAMT, l));
+ 	  break;
+ 
++	case '|':
+ 	case '<':
+ 	  print (info->stream, "0x%x", (int)EXTRACT_OPERAND (SHAMTW, l));
+ 	  break;
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 06c752a96d..e99febc823 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -495,6 +495,220 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"remw",     64, INSN_CLASS_M, "d,s,t",  MATCH_REMW, MASK_REMW, match_opcode, 0 },
+ {"remuw",    64, INSN_CLASS_M, "d,s,t",  MATCH_REMUW, MASK_REMUW, match_opcode, 0 },
+ 
++/* Bitmanip instruction subset */
++{"andn",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_ANDN, MASK_ANDN, match_opcode, 0 },
++{"orn",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_ORN, MASK_ORN, match_opcode, 0 },
++{"xnor",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_XNOR, MASK_XNOR, match_opcode, 0 },
++{"sloi",      0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_SLOI, MASK_SLOI, match_opcode, 0 },
++{"sroi",      0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_SROI, MASK_SROI, match_opcode, 0 },
++{"roli",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,>",  0, (int) M_RL, match_never, INSN_MACRO },
++{"rori",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,>",  MATCH_RORI, MASK_RORI, match_opcode, 0 },
++{"slo",       0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_SLO, MASK_SLO, match_opcode, 0 },
++{"slo",       0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_SLOI, MASK_SLOI, match_opcode, INSN_ALIAS },
++{"sro",       0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_SRO, MASK_SRO, match_opcode, 0 },
++{"sro",       0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_SROI, MASK_SROI, match_opcode, INSN_ALIAS },
++{"rol",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_ROL, MASK_ROL, match_opcode, 0 },
++{"rol",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,>",  0, (int) M_RL, match_never, INSN_MACRO },
++{"ror",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_ROR, MASK_ROR, match_opcode, 0 },
++{"ror",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,>",  MATCH_RORI, MASK_RORI, match_opcode, INSN_ALIAS },
++{"sbclri",    0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBCLRI, MASK_SBCLRI, match_opcode, 0 },
++{"sbseti",    0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBSETI, MASK_SBSETI, match_opcode, 0 },
++{"sbinvi",    0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBINVI, MASK_SBINVI, match_opcode, 0 },
++{"sbexti",    0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBEXTI, MASK_SBEXTI, match_opcode, 0 },
++{"gorci",     0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_GORCI, MASK_GORCI, match_opcode, 0 },
++{"grevi",     0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_GREVI, MASK_GREVI, match_opcode, 0 },
++{"sbclr",     0, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBCLR, MASK_SBCLR, match_opcode, 0 },
++{"sbclr",     0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBCLRI, MASK_SBCLRI, match_opcode, INSN_ALIAS },
++{"sbset",     0, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBSET, MASK_SBSET, match_opcode, 0 },
++{"sbset",     0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBSETI, MASK_SBSETI, match_opcode, INSN_ALIAS },
++{"sbinv",     0, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBINV, MASK_SBINV, match_opcode, 0 },
++{"sbinv",     0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBINVI, MASK_SBINVI, match_opcode, INSN_ALIAS },
++{"sbext",     0, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBEXT, MASK_SBEXT, match_opcode, 0 },
++{"sbext",     0, INSN_CLASS_B_OR_ZBS,   "d,s,>",  MATCH_SBEXTI, MASK_SBEXTI, match_opcode, INSN_ALIAS },
++{"gorc",      0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_GORC, MASK_GORC, match_opcode, 0 },
++{"gorc",      0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_GORCI, MASK_GORCI, match_opcode, INSN_ALIAS },
++{"grev",      0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_GREV, MASK_GREV, match_opcode, 0 },
++{"grev",      0, INSN_CLASS_B_OR_ZBP,   "d,s,>",  MATCH_GREVI, MASK_GREVI, match_opcode, INSN_ALIAS },
++{"cmix",      0, INSN_CLASS_B_OR_ZBT,   "d,t,s,r",  MATCH_CMIX, MASK_CMIX, match_opcode, 0 },
++{"cmov",      0, INSN_CLASS_B_OR_ZBT,   "d,t,s,r",  MATCH_CMOV, MASK_CMOV, match_opcode, 0 },
++{"fsli",      0, INSN_CLASS_B_OR_ZBT,   "d,s,r,>",  0, (int) M_FL, match_never, INSN_MACRO },
++{"fsri",      0, INSN_CLASS_B_OR_ZBT,   "d,s,r,>",  MATCH_FSRI, MASK_FSRI, match_opcode, 0 },
++{"fsl",       0, INSN_CLASS_B_OR_ZBT,   "d,s,r,t",  MATCH_FSL, MASK_FSL, match_opcode, 0 },
++{"fsl",       0, INSN_CLASS_B_OR_ZBT,   "d,s,r,>",  0, (int) M_FL, match_never, INSN_MACRO },
++{"fsr",       0, INSN_CLASS_B_OR_ZBT,   "d,s,r,t",  MATCH_FSR, MASK_FSR, match_opcode, 0 },
++{"fsr",       0, INSN_CLASS_B_OR_ZBT,   "d,s,r,>",  MATCH_FSRI, MASK_FSRI, match_opcode, INSN_ALIAS },
++{"clz",       0, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_CLZ, MASK_CLZ, match_opcode, 0 },
++{"ctz",       0, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_CTZ, MASK_CTZ, match_opcode, 0 },
++{"pcnt",      0, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_PCNT, MASK_PCNT, match_opcode, 0 },
++{"sext.b",    0, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_SEXT_B, MASK_SEXT_B, match_opcode, 0 },
++{"sext.h",    0, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_SEXT_H, MASK_SEXT_H, match_opcode, 0 },
++{"bmatflip", 64, INSN_CLASS_B_OR_ZBM,   "d,s",  MATCH_BMATFLIP, MASK_BMATFLIP, match_opcode, 0 },
++{"crc32.b",   0, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32_B, MASK_CRC32_B, match_opcode, 0 },
++{"crc32.h",   0, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32_H, MASK_CRC32_H, match_opcode, 0 },
++{"crc32.w",   0, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32_W, MASK_CRC32_W, match_opcode, 0 },
++{"crc32.d",  64, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32_D, MASK_CRC32_D, match_opcode, 0 },
++{"crc32c.b",  0, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32C_B, MASK_CRC32C_B, match_opcode, 0 },
++{"crc32c.h",  0, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32C_H, MASK_CRC32C_H, match_opcode, 0 },
++{"crc32c.w",  0, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32C_W, MASK_CRC32C_W, match_opcode, 0 },
++{"crc32c.d", 64, INSN_CLASS_B_OR_ZBR,   "d,s",  MATCH_CRC32C_D, MASK_CRC32C_D, match_opcode, 0 },
++{"sh1add",    0, INSN_CLASS_B_OR_ZBA,   "d,s,t",  MATCH_SH1ADD, MASK_SH1ADD, match_opcode, 0 },
++{"sh2add",    0, INSN_CLASS_B_OR_ZBA,   "d,s,t",  MATCH_SH2ADD, MASK_SH2ADD, match_opcode, 0 },
++{"sh3add",    0, INSN_CLASS_B_OR_ZBA,   "d,s,t",  MATCH_SH3ADD, MASK_SH3ADD, match_opcode, 0 },
++{"clmul",     0, INSN_CLASS_B_OR_ZBC,   "d,s,t",  MATCH_CLMUL, MASK_CLMUL, match_opcode, 0 },
++{"clmulh",    0, INSN_CLASS_B_OR_ZBC,   "d,s,t",  MATCH_CLMULH, MASK_CLMULH, match_opcode, 0 },
++{"clmulr",    0, INSN_CLASS_B_OR_ZBC,   "d,s,t",  MATCH_CLMULR, MASK_CLMULR, match_opcode, 0 },
++{"min",       0, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_MIN, MASK_MIN, match_opcode, 0 },
++{"max",       0, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_MAX, MASK_MAX, match_opcode, 0 },
++{"minu",      0, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_MINU, MASK_MINU, match_opcode, 0 },
++{"maxu",      0, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_MAXU, MASK_MAXU, match_opcode, 0 },
++{"shfli",     0, INSN_CLASS_B_OR_ZBP,   "d,s,|",  MATCH_SHFLI, MASK_SHFLI, match_opcode, 0 },
++{"unshfli",   0, INSN_CLASS_B_OR_ZBP,   "d,s,|",  MATCH_UNSHFLI, MASK_UNSHFLI, match_opcode, 0 },
++{"shfl",      0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_SHFL, MASK_SHFL, match_opcode, 0 },
++{"shfl",      0, INSN_CLASS_B_OR_ZBP,   "d,s,|",  MATCH_SHFLI, MASK_SHFLI, match_opcode, INSN_ALIAS },
++{"unshfl",    0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_UNSHFL, MASK_UNSHFL, match_opcode, 0 },
++{"unshfl",    0, INSN_CLASS_B_OR_ZBP,   "d,s,|",  MATCH_UNSHFLI, MASK_UNSHFLI, match_opcode, INSN_ALIAS },
++{"bdep",      0, INSN_CLASS_B_OR_ZBE,   "d,s,t",  MATCH_BDEP, MASK_BDEP, match_opcode, 0 },
++{"bext",      0, INSN_CLASS_B_OR_ZBE,   "d,s,t",  MATCH_BEXT, MASK_BEXT, match_opcode, 0 },
++{"pack",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACK, MASK_PACK, match_opcode, 0 },
++{"packu",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACKU, MASK_PACKU, match_opcode, 0 },
++{"packh",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACKH, MASK_PACKH, match_opcode, 0 },
++{"bmator",   64, INSN_CLASS_B_OR_ZBM,   "d,s,t",  MATCH_BMATOR, MASK_BMATOR, match_opcode, 0 },
++{"bmatxor",  64, INSN_CLASS_B_OR_ZBM,   "d,s,t",  MATCH_BMATXOR, MASK_BMATXOR, match_opcode, 0 },
++{"bfp",       0, INSN_CLASS_B_OR_ZBF,   "d,s,t",  MATCH_BFP, MASK_BFP, match_opcode, 0 },
++{"addiwu",   64, INSN_CLASS_B_OR_ZBB,   "d,s,j",  MATCH_ADDIWU, MASK_ADDIWU, match_opcode, 0 },
++{"slliu.w",  64, INSN_CLASS_B_OR_ZBB,   "d,s,>",  MATCH_SLLIU_W, MASK_SLLIU_W, match_opcode, 0 },
++{"addwu",    64, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_ADDWU, MASK_ADDWU, match_opcode, 0 },
++{"subwu",    64, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_SUBWU, MASK_SUBWU, match_opcode, 0 },
++{"addu.w",   64, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_ADDU_W, MASK_ADDU_W, match_opcode, 0 },
++{"subu.w",   64, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_SUBU_W, MASK_SUBU_W, match_opcode, 0 },
++{"sloiw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_SLOIW, MASK_SLOIW, match_opcode, 0 },
++{"sroiw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_SROIW, MASK_SROIW, match_opcode, 0 },
++{"roliw",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,<",  0, (int) M_RL, match_never, INSN_MACRO },
++{"roriw",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,<",  MATCH_RORIW, MASK_RORIW, match_opcode, 0 },
++{"slow",     64, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_SLOW, MASK_SLOW, match_opcode, 0 },
++{"slow",     64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_SLOIW, MASK_SLOIW, match_opcode, INSN_ALIAS },
++{"srow",     64, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_SROW, MASK_SROW, match_opcode, 0 },
++{"srow",     64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_SROIW, MASK_SROIW, match_opcode, INSN_ALIAS },
++{"rolw",     64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_ROLW, MASK_ROLW, match_opcode, 0 },
++{"rolw",     64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,<",  0, (int) M_RL, match_never, INSN_MACRO },
++{"rorw",     64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_RORW, MASK_RORW, match_opcode, 0 },
++{"rorw",     64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,<",  MATCH_RORIW, MASK_RORIW, match_opcode, INSN_ALIAS },
++{"sbclriw",  64, INSN_CLASS_B_OR_ZBS,   "d,s,<",  MATCH_SBCLRIW, MASK_SBCLRIW, match_opcode, 0 },
++{"sbsetiw",  64, INSN_CLASS_B_OR_ZBS,   "d,s,<",  MATCH_SBSETIW, MASK_SBSETIW, match_opcode, 0 },
++{"sbinviw",  64, INSN_CLASS_B_OR_ZBS,   "d,s,<",  MATCH_SBINVIW, MASK_SBINVIW, match_opcode, 0 },
++{"gorciw",   64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_GORCIW, MASK_GORCIW, match_opcode, 0 },
++{"greviw",   64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_GREVIW, MASK_GREVIW, match_opcode, 0 },
++{"sbclrw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBCLRW, MASK_SBCLRW, match_opcode, 0 },
++{"sbclrw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,<",  MATCH_SBCLRIW, MASK_SBCLRIW, match_opcode, INSN_ALIAS },
++{"sbsetw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBSETW, MASK_SBSETW, match_opcode, 0 },
++{"sbsetw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,<",  MATCH_SBSETIW, MASK_SBSETIW, match_opcode, INSN_ALIAS },
++{"sbinvw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBINVW, MASK_SBINVW, match_opcode, 0 },
++{"sbinvw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,<",  MATCH_SBINVIW, MASK_SBINVIW, match_opcode, INSN_ALIAS },
++{"sbextw",   64, INSN_CLASS_B_OR_ZBS,   "d,s,t",  MATCH_SBEXTW, MASK_SBEXTW, match_opcode, 0 },
++{"gorcw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_GORCW, MASK_GORCW, match_opcode, 0 },
++{"gorcw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_GORCIW, MASK_GORCIW, match_opcode, INSN_ALIAS },
++{"grevw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_GREVW, MASK_GREVW, match_opcode, 0 },
++{"grevw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_GREVIW, MASK_GREVIW, match_opcode, INSN_ALIAS },
++{"fsliw",    64, INSN_CLASS_B_OR_ZBT,   "d,s,r,<",  0, (int) M_FL, match_never, INSN_MACRO },
++{"fsriw",    64, INSN_CLASS_B_OR_ZBT,   "d,s,r,<",  MATCH_FSRIW, MASK_FSRIW, match_opcode, 0 },
++{"fslw",     64, INSN_CLASS_B_OR_ZBT,   "d,s,r,t",  MATCH_FSLW, MASK_FSLW, match_opcode, 0 },
++{"fslw",     64, INSN_CLASS_B_OR_ZBT,   "d,s,r,<",  0, (int) M_FL, match_never, INSN_MACRO },
++{"fsrw",     64, INSN_CLASS_B_OR_ZBT,   "d,s,r,t",  MATCH_FSRW, MASK_FSRW, match_opcode, 0 },
++{"fsrw",     64, INSN_CLASS_B_OR_ZBT,   "d,s,r,<",  MATCH_FSRIW, MASK_FSRIW, match_opcode, INSN_ALIAS },
++{"clzw",     64, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_CLZW, MASK_CLZW, match_opcode, 0 },
++{"ctzw",     64, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_CTZW, MASK_CTZW, match_opcode, 0 },
++{"pcntw",    64, INSN_CLASS_B_OR_ZBB,   "d,s",  MATCH_PCNTW, MASK_PCNTW, match_opcode, 0 },
++{"sh1addu.w",64, INSN_CLASS_B_OR_ZBA,   "d,s,t",  MATCH_SH1ADDU_W, MASK_SH1ADDU_W, match_opcode, 0 },
++{"sh2addu.w",64, INSN_CLASS_B_OR_ZBA,   "d,s,t",  MATCH_SH2ADDU_W, MASK_SH2ADDU_W, match_opcode, 0 },
++{"sh3addu.w",64, INSN_CLASS_B_OR_ZBA,   "d,s,t",  MATCH_SH3ADDU_W, MASK_SH3ADDU_W, match_opcode, 0 },
++{"clmulw",   64, INSN_CLASS_B_OR_ZBC,   "d,s,t",  MATCH_CLMULW, MASK_CLMULW, match_opcode, 0 },
++{"clmulhw",  64, INSN_CLASS_B_OR_ZBC,   "d,s,t",  MATCH_CLMULHW, MASK_CLMULHW, match_opcode, 0 },
++{"clmulrw",  64, INSN_CLASS_B_OR_ZBC,   "d,s,t",  MATCH_CLMULRW, MASK_CLMULRW, match_opcode, 0 },
++{"shflw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_SHFLW, MASK_SHFLW, match_opcode, 0 },
++{"unshflw",  64, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_UNSHFLW, MASK_UNSHFLW, match_opcode, 0 },
++{"bdepw",    64, INSN_CLASS_B_OR_ZBE,   "d,s,t",  MATCH_BDEPW, MASK_BDEPW, match_opcode, 0 },
++{"bextw",    64, INSN_CLASS_B_OR_ZBE,   "d,s,t",  MATCH_BEXTW, MASK_BEXTW, match_opcode, 0 },
++{"packw",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACKW, MASK_PACKW, match_opcode, 0 },
++{"packuw",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACKUW, MASK_PACKUW, match_opcode, 0 },
++{"bfpw",     64, INSN_CLASS_B_OR_ZBF,   "d,s,t",  MATCH_BFPW, MASK_BFPW, match_opcode, 0 },
++
++/* Bitmanip pseudo-instructions */
++{"rev.p",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev2.n",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev.n",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev4.b",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev2.b",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev.b",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev8.h",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev4.h",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev2.h",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev.h",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev16.w",  64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev8.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev4.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev2.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev.w",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev32",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev16",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev8",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev4",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev2",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"rev",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++
++{"orc.p",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc2.n",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc.n",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc4.b",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc2.b",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc.b",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc8.h",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc4.h",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc2.h",    0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc.h",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc16.w",  64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc8.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc4.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc2.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc.w",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc32",    64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc16",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc8",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc4",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc2",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"orc",       0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++
++{"zip.n",     0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip2.b",    0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip.b",     0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip4.h",    0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip2.h",    0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip.h",     0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip8.w",   64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip4.w",   64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip2.w",   64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip.w",    64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip16",    64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip8",      0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip4",      0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip2",      0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"zip",       0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++
++{"unzip.n",   0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip2.b",  0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip.b",   0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip4.h",  0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip2.h",  0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip.h",   0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip8.w", 64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip4.w", 64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip2.w", 64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip.w",  64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip16",  64, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip8",    0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip4",    0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip2",    0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++{"unzip",     0, INSN_CLASS_B_OR_ZBP,   "d,s",  0, (int) M_PERM, match_never, INSN_MACRO },
++
+ /* Single-precision floating-point instruction subset */
+ {"frcsr",     0, INSN_CLASS_F,   "d",  MATCH_FRCSR, MASK_FRCSR, match_opcode, INSN_ALIAS },
+ {"frsr",      0, INSN_CLASS_F,   "d",  MATCH_FRCSR, MASK_FRCSR, match_opcode, INSN_ALIAS },
