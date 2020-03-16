@@ -6,12 +6,17 @@ variables:
   RISCV_GNU_TOOLCHAIN_COMMIT_ID: 2e334e222d43bcde237c289385c977dcab81eda9
 
 trigger:
+  batch: true
+  branches:
+    include:
+    - '*'
   tags:
     include:
     - '*'
+pr:
   branches:
     include:
-    - master
+    - '*'
 
 jobs:
 - job: "GCC_Ibex"
