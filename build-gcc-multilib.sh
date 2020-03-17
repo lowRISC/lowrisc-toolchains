@@ -15,7 +15,8 @@ mkdir -p build/gcc
 cd build/gcc
 
 # Checkout riscv-gnu-toolchain
-git clone --recursive https://github.com/riscv/riscv-gnu-toolchain
+git clone --recursive https://github.com/riscv/riscv-gnu-toolchain \
+     --depth=1 --shallow-submodules
 cd riscv-gnu-toolchain
 git checkout --force $RISCV_GNU_TOOLCHAIN_COMMIT_ID
 
