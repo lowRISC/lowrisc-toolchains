@@ -15,10 +15,25 @@ mkdir -p build/gcc
 cd build/gcc
 
 # Checkout riscv-gnu-toolchain
-git clone --recursive https://github.com/riscv/riscv-gnu-toolchain \
-     --depth=1 --shallow-submodules
+git clone https://github.com/riscv/riscv-gnu-toolchain
 cd riscv-gnu-toolchain
 git checkout --force $RISCV_GNU_TOOLCHAIN_COMMIT_ID
+
+# Try a shallow update.
+git config -f .gitmodules --type=bool submodule.riscv-binutils.shallow true
+git config -f .gitmodules --type=bool submodule.riscv-gcc.shallow true
+git config -f .gitmodules --type=bool submodule.riscv-glibc.shallow true
+git config -f .gitmodules --type=bool submodule.riscv-dejagnu.shallow true
+git config -f .gitmodules --type=bool submodule.riscv-newlib.shallow true
+git config -f .gitmodules --type=bool submodule.riscv-gdb.shallow true
+# This is explicitly disabled, as a shallow update breaks qemu
+#   git config -f .gitmodules --type=bool submodule.qemu.shallow true
+
+# Updated Gitmodules configuration
+cat .gitmodules
+
+git submodule update --init --recursive --recommend-shallow
+
 
 # Build ELF Multilib
 ./configure --prefix=/tools/riscv/elf \
