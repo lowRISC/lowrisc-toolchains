@@ -66,6 +66,7 @@ jobs:
 
 - job: "GCC_Multilib"
   displayName: "RV64 GCC (Multilib)"
+  condition: false
   pool:
     vmImage: "ubuntu-16.04"
   timeoutInMinutes: 360

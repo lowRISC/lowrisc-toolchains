@@ -19,8 +19,10 @@ TOOLCHAIN_NAME=lowrisc-toolchain-gcc-rv32imc-$TAG_NAME
 #export CT_PREFIX=/tools/riscv
 
 mkdir -p build/gcc
+cp lowrisc-toolchain-gcc-rv32imc.config build/gcc/.config
+echo CT_LOCAL_PATCH_DIR=\"$PWD/patches\" | \
+    tee -a build/gcc/.config
 cd build/gcc
-cp ../../lowrisc-toolchain-gcc-rv32imc.config .config
 ct-ng upgradeconfig
 cat .config
 ct-ng build
