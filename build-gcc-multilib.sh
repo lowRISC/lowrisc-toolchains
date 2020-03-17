@@ -28,6 +28,7 @@ make -j$(( `nproc` * 2 ))
 # Cleanup between builds
 make clean
 git clean -fdx
+git submodule foreach --recursive git clean -fdx
 
 # Build Linux Multilib
 ./configure --prefix=/tools/riscv/linux \
