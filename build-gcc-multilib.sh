@@ -13,23 +13,27 @@ TOOLCHAIN_NAME=lowrisc-toolchain-gcc-multilib-$TAG_NAME
 
 mkdir -p build/gcc
 cd build/gcc
+
+# Checkout riscv-gnu-toolchain
 git clone --recursive https://github.com/riscv/riscv-gnu-toolchain
 cd riscv-gnu-toolchain
-git checkout $RISCV_GNU_TOOLCHAIN_COMMIT_ID
+git checkout --force $RISCV_GNU_TOOLCHAIN_COMMIT_ID
 
 # Build ELF Multilib
 ./configure --prefix=/tools/riscv/elf \
     --enable-multilib
 make -j$(( `nproc` * 2 ))
 
+# Cleanup between builds
 make clean
+git clean -fdx
+
 # Build Linux Multilib
 ./configure --prefix=/tools/riscv/linux \
     --enable-multilib
-make -j$(( `nproc` * 2 )) linux
+make -j$(( `nproc` * 2 )) linux build-qemu
 
-make -j$(( `nproc` * 2 )) build-qemu
-
+# Collect Build info
 echo -n 'lowRISC toolchain version: ' >> /tools/riscv/buildinfo
 git -C $TOP describe --always >> /tools/riscv/buildinfo
 
@@ -41,6 +45,7 @@ echo -n 'GCC version: ' >> /tools/riscv/buildinfo
 
 echo "Built at $(date -u) on $(hostname)" >> /tools/riscv/buildinfo
 
+# Create archive
 tar -cJ \
   --directory=/tools \
   -f $ARTIFACT_STAGING_DIR/$TOOLCHAIN_NAME.tar.xz \
