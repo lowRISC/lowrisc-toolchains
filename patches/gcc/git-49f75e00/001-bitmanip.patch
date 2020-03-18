@@ -1,0 +1,1784 @@
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index a16d6c5b448..91bc47f774c 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -575,6 +575,10 @@ riscv_parse_arch_string (const char *isa, int *flags, location_t loc)
+   if (subset_list->lookup ("c"))
+     *flags |= MASK_RVC;
+ 
++  *flags &= ~MASK_BITMANIP;
++  if (subset_list->lookup ("b"))
++    *flags |= MASK_BITMANIP;
++
+   if (current_subset_list)
+     delete current_subset_list;
+ 
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 69d0a024d85..21a113982a7 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -523,6 +523,7 @@ pru-*-*)
+ 	;;
+ riscv*)
+ 	cpu_type=riscv
++	extra_headers="rvintrin.h"
+ 	extra_objs="riscv-builtins.o riscv-c.o"
+ 	d_target_objs="riscv-d.o"
+ 	;;
+diff --git a/gcc/config/riscv/bitmanip.md b/gcc/config/riscv/bitmanip.md
+new file mode 100644
+index 00000000000..9980c6c2b5e
+--- /dev/null
++++ b/gcc/config/riscv/bitmanip.md
+@@ -0,0 +1,383 @@
++;; Machine description for RISC-V Bit Manipulation operations.
++;; Copyright (C) 2019 Free Software Foundation, Inc.
++
++;; This file is part of GCC.
++
++;; GCC is free software; you can redistribute it and/or modify
++;; it under the terms of the GNU General Public License as published by
++;; the Free Software Foundation; either version 3, or (at your option)
++;; any later version.
++
++;; GCC is distributed in the hope that it will be useful,
++;; but WITHOUT ANY WARRANTY; without even the implied warranty of
++;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++;; GNU General Public License for more details.
++
++;; You should have received a copy of the GNU General Public License
++;; along with GCC; see the file COPYING3.  If not see
++;; <http://www.gnu.org/licenses/>.
++
++(define_code_iterator bitmanip_bitwise [and ior])
++
++(define_code_iterator any_minmax [smin smax umin umax])
++
++(define_code_attr bitmanip_optab [(smin "smin")
++				  (smax "smax")
++				  (umin "umin")
++				  (umax "umax")])
++
++(define_code_attr bitmanip_insn [(smin "min")
++				 (smax "max")
++				 (umin "minu")
++				 (umax "maxu")])
++
++(define_insn "clzsi2"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(clz:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  { return TARGET_64BIT ? "clzw\t%0,%1" : "clz\t%0,%1"; }
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "clzdi2"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(clz:DI (match_operand:DI 1 "register_operand" "r")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "clz\t%0,%1"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "ctzsi2"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(ctz:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  { return TARGET_64BIT ? "ctzw\t%0,%1" : "ctz\t%0,%1"; }
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "ctzdi2"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(ctz:DI (match_operand:DI 1 "register_operand" "r")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "ctz\t%0,%1"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "popcountsi2"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(popcount:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  { return TARGET_64BIT ? "pcntw\t%0,%1" : "pcnt\t%0,%1"; }
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "popcountdi2"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(popcount:DI (match_operand:DI 1 "register_operand" "r")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "pcnt\t%0,%1"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*<optab>_not<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(bitmanip_bitwise:X (not:X (match_operand:X 1 "register_operand" "r"))
++			    (match_operand:X 2 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  "<insn>n\t%0,%2,%1"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*xor_not<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(not:X (xor:X (match_operand:X 1 "register_operand" "r")
++		      (match_operand:X 2 "register_operand" "r"))))]
++  "TARGET_BITMANIP"
++  "xnor\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++ 
++;;; ??? pack
++
++;; ??? assembler doesn't support zext.h
++(define_insn "*zero_extendhi<GPR:mode>2_bitmanip"
++  [(set (match_operand:GPR 0 "register_operand" "=r,r")
++	(zero_extend:GPR (match_operand:HI 1 "nonimmediate_operand" "r,m")))]
++  "TARGET_BITMANIP"
++{
++  if (which_alternative == 0)
++   return TARGET_64BIT ? "packw\t%0,%1,x0" : "pack\t%0,%1,x0";
++  else
++   return "lhu\t%0,%1";
++}
++  [(set_attr "type" "bitmanip,load")])
++
++;; ??? assembler doesn't support zext.w
++(define_insn "*zero_extendsidi2_bitmanip"
++  [(set (match_operand:DI 0 "register_operand" "=r,r")
++	(zero_extend:DI (match_operand:SI 1 "nonimmediate_operand" "r,m")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "@
++   pack\t%0,%1,x0
++   lwu\t%0,%1"
++  [(set_attr "type" "bitmanip,load")])
++
++(define_insn "<bitmanip_optab><mode>3"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(any_minmax:X (match_operand:X 1 "register_operand" "r")
++		      (match_operand:X 2 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  "<bitmanip_insn>\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++;;; ??? check sb*iw
++
++(define_insn "*sbset<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(ior:X (ashift:X (const_int 1)
++			 (match_operand:QI 2 "register_operand" "=r"))
++	       (match_operand:X 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  "sbset\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbseti<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(ior:X (match_operand:X 1 "register_operand" "r")
++	       (match_operand 2 "single_bit_mask_operand" "i")))]
++  "TARGET_BITMANIP"
++  "sbseti\t%0,%1,%S2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbsetw"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(sign_extend:DI
++	 (subreg:SI
++	  (ior:DI (subreg:DI
++		   (ashift:SI (const_int 1)
++			      (match_operand:QI 2 "register_operand" "=r")) 0)
++		  (match_operand:DI 1 "register_operand" "r")) 0)))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "sbsetw\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbclr<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(and:X (rotate:X (const_int -2)
++			 (match_operand:QI 2 "register_operand" "=r"))
++	       (match_operand:X 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  "sbclr\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbclri<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(and:X (match_operand:X 1 "register_operand" "r")
++	       (match_operand 2 "not_single_bit_mask_operand" "i")))]
++  "TARGET_BITMANIP"
++  "sbclri\t%0,%1,%T2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbclrw"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(sign_extend:DI
++	 (subreg:SI
++	  (and:DI
++	   (not:DI (subreg:DI
++		    (ashift:SI (const_int 1)
++			       (match_operand:QI 2 "register_operand" "=r")) 0))
++	   (match_operand:DI 1 "register_operand" "r")) 0)))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "sbclrw\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbinv<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(xor:X (ashift:X (const_int 1)
++			 (match_operand:QI 2 "register_operand" "=r"))
++	       (match_operand:X 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  "sbinv\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbinvi<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(xor:X (match_operand:X 1 "register_operand" "r")
++	       (match_operand 2 "single_bit_mask_operand" "i")))]
++  "TARGET_BITMANIP"
++  "sbinvi\t%0,%1,%S2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbinvw"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(sign_extend:DI
++	 (subreg:SI
++	  (xor:DI (subreg:DI
++		   (ashift:SI (const_int 1)
++			      (match_operand:QI 2 "register_operand" "=r")) 0)
++		  (match_operand:DI 1 "register_operand" "r")) 0)))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "sbinvw\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbext<mode>"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(zero_extract:X (match_operand:X 1 "register_operand" "r")
++			(const_int 1)
++			(zero_extend:X
++			 (match_operand:QI 2 "register_operand" "r"))))]
++  "TARGET_BITMANIP"
++  "sbext\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbexti"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(zero_extract:X (match_operand:X 1 "register_operand" "r")
++			(const_int 1)
++			(match_operand 2 "immediate_operand" "i")))]
++  "TARGET_BITMANIP"
++  "sbexti\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*sbextw"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(and:DI
++	 (subreg:DI
++	  (lshiftrt:SI (match_operand:SI 1 "register_operand" "r")
++		       (match_operand:QI 2 "register_operand" "r")) 0)
++	 (const_int 1)))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "sbextw\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++;;; ??? s[lr]o*
++
++(define_insn "rotrsi3"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(rotatert:SI (match_operand:SI 1 "register_operand" "r")
++		     (match_operand:SI 2 "arith_operand" "rI")))]
++  "TARGET_BITMANIP"
++  { return TARGET_64BIT ? "ror%i2w\t%0,%1,%2" : "ror%i2\t%0,%1,%2"; }
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "rotrdi3"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(rotatert:DI (match_operand:DI 1 "register_operand" "r")
++		     (match_operand:DI 2 "arith_operand" "rI")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "ror%i2\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_expand "riscv_rolw"
++  [(match_operand:SI 0 "register_operand" "=r")
++   (match_operand:SI 1 "register_operand" "r")
++   (match_operand:SI 2 "register_operand" "r")]
++  "TARGET_BITMANIP && TARGET_64BIT"
++{
++  emit_insn (gen_rotlsi3 (operands[0], operands[1], operands[2]));
++  DONE;
++})
++
++(define_insn "rotlsi3"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(rotate:SI (match_operand:SI 1 "register_operand" "r")
++		   (match_operand:SI 2 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  { return TARGET_64BIT ? "rolw\t%0,%1,%2" : "rol\t%0,%1,%2"; }
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "rotldi3"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(rotate:DI (match_operand:DI 1 "register_operand" "r")
++		   (match_operand:DI 2 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  "rol\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "rotlsi3_sext"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(sign_extend:DI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_BITMANIP"
++  "rolw\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++;;; ??? grev
++
++;;; ??? assembler doesn't accept rev8
++(define_insn "bswapsi2"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(bswap:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_BITMANIP"
++  { return TARGET_64BIT ? "greviw\t%0,%1,0x18" : "grevi\t%0,%1,0x18"; }
++  [(set_attr "type" "bitmanip")])
++
++;;; ??? assembler doesn't accept rev8
++(define_insn "bswapdi2"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(bswap:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "grevi\t%0,%1,0x38"
++  [(set_attr "type" "bitmanip")])
++
++;;; ??? shfl/unshfl
++
++;;; ??? bext/bdep
++
++;;; ??? clmul
++
++;;; ??? crc
++
++;;; ??? bmat
++
++(define_insn "*cmix"
++  [(set (match_operand:X 0 "register_operand" "=r")
++	(xor:X (and:X (xor:X (match_operand:X 1 "register_operand" "r")
++			     (match_operand:X 3 "register_operand" "r"))
++		      (match_operand:X 2 "register_operand" "r"))
++	       (match_dup 3)))]
++  "TARGET_BITMANIP"
++  "cmix\t%0,%2,%1,%3"
++  [(set_attr "type" "bitmanip")])
++
++;;; ??? cmov
++
++;;; ??? fs[lr]
++
++(define_insn "*addwu"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(zero_extend:DI (plus:SI (match_operand:SI 1 "register_operand" "r")
++				 (match_operand:SI 2 "arith_operand" "rI"))))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "add%i2wu\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*subwu"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(zero_extend:DI (minus:SI (match_operand:SI 1 "register_operand" "r")
++				  (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "subwu\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*addu.w"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(plus:DI (zero_extend:DI
++		  (subreg:SI (match_operand:DI 2 "register_operand" "r") 0))
++		 (match_operand:DI 1 "register_operand" "r")))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "addu.w\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*subu.w"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(minus:DI (match_operand:DI 1 "register_operand" "r")
++		  (zero_extend:DI
++		   (subreg:SI (match_operand:DI 2 "register_operand" "r") 0))))]
++  "TARGET_64BIT && TARGET_BITMANIP"
++  "subu.w\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "*slliuw"
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(and:DI (ashift:DI (match_operand:DI 1 "register_operand" "r")
++			   (match_operand:QI 2 "immediate_operand" "I"))
++		(match_operand 3 "immediate_operand" "")))]
++  "TARGET_64BIT && TARGET_BITMANIP
++   && (INTVAL (operands[3]) >> INTVAL (operands[2])) == 0xffffffff"
++  "slliu.w\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++;; ??? bfxp
+diff --git a/gcc/config/riscv/predicates.md b/gcc/config/riscv/predicates.md
+index aa5e1327dd5..6dbd011bbaa 100644
+--- a/gcc/config/riscv/predicates.md
++++ b/gcc/config/riscv/predicates.md
+@@ -76,7 +76,10 @@
+ 
+   /* Otherwise check whether the constant can be loaded in a single
+      instruction.  */
+-  return !LUI_OPERAND (INTVAL (op)) && !SMALL_OPERAND (INTVAL (op));
++  return (!LUI_OPERAND (INTVAL (op)) && !SMALL_OPERAND (INTVAL (op))
++	  && !(TARGET_64BIT && TARGET_BITMANIP
++	       && (ZERO_EXTENDED_SMALL_OPERAND (INTVAL (op))
++		   || SINGLE_BIT_MASK_OPERAND (INTVAL (op)))));
+ })
+ 
+ (define_predicate "p2m1_shift_operand"
+@@ -206,3 +209,12 @@
+ 
+ (define_predicate "fp_branch_comparison"
+   (match_code "unordered,ordered,unlt,unge,unle,ungt,uneq,ltgt,ne,eq,lt,le,gt,ge"))
++
++;; Predicates for the B extension.
++(define_predicate "single_bit_mask_operand"
++  (and (match_code "const_int")
++       (match_test "pow2p_hwi (INTVAL (op))")))
++
++(define_predicate "not_single_bit_mask_operand"
++  (and (match_code "const_int")
++       (match_test "pow2p_hwi (~INTVAL (op))")))
+diff --git a/gcc/config/riscv/riscv-builtins.c b/gcc/config/riscv/riscv-builtins.c
+index 80169fa9887..97f188e4813 100644
+--- a/gcc/config/riscv/riscv-builtins.c
++++ b/gcc/config/riscv/riscv-builtins.c
+@@ -39,6 +39,7 @@ along with GCC; see the file COPYING3.  If not see
+ 
+ /* Macros to create an enumeration identifier for a function prototype.  */
+ #define RISCV_FTYPE_NAME1(A, B) RISCV_##A##_FTYPE_##B
++#define RISCV_FTYPE_NAME2(A, B, C) RISCV_##A##_FTYPE_##B##_##C
+ 
+ /* Classifies the prototype of a built-in function.  */
+ enum riscv_function_type {
+@@ -84,6 +85,7 @@ struct riscv_builtin_description {
+   unsigned int (*avail) (void);
+ };
+ 
++AVAIL (bitmanip64, TARGET_64BIT && TARGET_BITMANIP)
+ AVAIL (hard_float, TARGET_HARD_FLOAT)
+ 
+ /* Construct a riscv_builtin_description from the given arguments.
+@@ -118,13 +120,19 @@ AVAIL (hard_float, TARGET_HARD_FLOAT)
+ /* Argument types.  */
+ #define RISCV_ATYPE_VOID void_type_node
+ #define RISCV_ATYPE_USI unsigned_intSI_type_node
++#define RISCV_ATYPE_SI intSI_type_node
+ 
+ /* RISCV_FTYPE_ATYPESN takes N RISCV_FTYPES-like type codes and lists
+    their associated RISCV_ATYPEs.  */
+ #define RISCV_FTYPE_ATYPES1(A, B) \
+   RISCV_ATYPE_##A, RISCV_ATYPE_##B
+ 
++#define RISCV_FTYPE_ATYPES2(A, B, C) \
++  RISCV_ATYPE_##A, RISCV_ATYPE_##B, RISCV_ATYPE_##C
++
+ static const struct riscv_builtin_description riscv_builtins[] = {
++  DIRECT_BUILTIN (pcntw, RISCV_SI_FTYPE_SI, bitmanip64),
++  DIRECT_BUILTIN (rolw, RISCV_SI_FTYPE_SI_SI, bitmanip64),
+   DIRECT_BUILTIN (frflags, RISCV_USI_FTYPE_VOID, hard_float),
+   DIRECT_NO_TARGET_BUILTIN (fsflags, RISCV_VOID_FTYPE_USI, hard_float)
+ };
+diff --git a/gcc/config/riscv/riscv-ftypes.def b/gcc/config/riscv/riscv-ftypes.def
+index eefe3033ea0..ff72fa7ec79 100644
+--- a/gcc/config/riscv/riscv-ftypes.def
++++ b/gcc/config/riscv/riscv-ftypes.def
+@@ -28,3 +28,5 @@ along with GCC; see the file COPYING3.  If not see
+ 
+ DEF_RISCV_FTYPE (1, (USI, VOID))
+ DEF_RISCV_FTYPE (1, (VOID, USI))
++DEF_RISCV_FTYPE (1, (SI, SI))
++DEF_RISCV_FTYPE (2, (SI, SI, SI))
+diff --git a/gcc/config/riscv/riscv.c b/gcc/config/riscv/riscv.c
+index b8a8778b92c..6a21bb87d59 100644
+--- a/gcc/config/riscv/riscv.c
++++ b/gcc/config/riscv/riscv.c
+@@ -374,6 +374,27 @@ riscv_build_integer_1 (struct riscv_integer_op codes[RISCV_MAX_INTEGER_OPS],
+       return 1;
+     }
+ 
++  /* ??? Maybe there are also other bitmanip instructions useful for loading
++     constants?  */
++  if (TARGET_64BIT && TARGET_BITMANIP)
++    {
++      if (ZERO_EXTENDED_SMALL_OPERAND (value))
++	{
++	  /* Simply ADDIWU.  */
++	  codes[0].code = UNKNOWN;
++	  codes[0].value = value;
++	  return 1;
++	}
++      else if (SINGLE_BIT_MASK_OPERAND (value))
++	{
++	  /* Simply SBSET.  */
++	  codes[0].code = UNKNOWN;
++	  codes[0].value = value;
++	  return 1;
++	}
++      /* ??? Can use slo/sro to load constants.  */
++    }
++
+   /* End with ADDI.  When constructing HImode constants, do not generate any
+      intermediate value that is not itself a valid HImode constant.  The
+      XORI case below will handle those remaining HImode constants.  */
+@@ -1639,12 +1660,21 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
+ 
+     case ZERO_EXTRACT:
+       /* This is an SImode shift.  */
+-      if (outer_code == SET && (INTVAL (XEXP (x, 2)) > 0)
++      if (outer_code == SET && GET_CODE (XEXP (x, 2)) == CONST_INT
++	  && (INTVAL (XEXP (x, 2)) > 0) && GET_CODE (XEXP (x, 1)) == CONST_INT
+ 	  && (INTVAL (XEXP (x, 1)) + INTVAL (XEXP (x, 2)) == 32))
+ 	{
+ 	  *total = COSTS_N_INSNS (SINGLE_SHIFT_COST);
+ 	  return true;
+ 	}
++      /* This is an sbext.  */
++      if (TARGET_BITMANIP && outer_code == SET
++	  && GET_CODE (XEXP (x, 1)) == CONST_INT
++	  && INTVAL (XEXP (x, 1)) == 1)
++	{
++	  *total = COSTS_N_INSNS (SINGLE_SHIFT_COST);
++	  return true;
++	}
+       return false;
+ 
+     case ASHIFT:
+@@ -1923,7 +1953,21 @@ riscv_output_move (rtx dest, rtx src)
+ 	  }
+ 
+       if (src_code == CONST_INT)
+-	return "li\t%0,%1";
++	{
++	  if (SMALL_OPERAND (INTVAL (src)) || LUI_OPERAND (INTVAL (src)))
++	    return "li\t%0,%1";
++
++	  if (TARGET_BITMANIP && TARGET_64BIT)
++	    {
++	      if (ZERO_EXTENDED_SMALL_OPERAND (INTVAL (src)))
++		return "addiwu\t%0,zero,%s1";
++	      if (SINGLE_BIT_MASK_OPERAND (INTVAL (src)))
++		return "sbseti\t%0,zero,%S1";
++	    }
++
++	  /* Should never reach here.  */
++	  abort ();
++	}
+ 
+       if (src_code == HIGH)
+ 	return "lui\t%0,%h1";
+@@ -3257,7 +3301,9 @@ riscv_memmodel_needs_release_fence (enum memmodel model)
+    'A'	Print the atomic operation suffix for memory model OP.
+    'F'	Print a FENCE if the memory model requires a release.
+    'z'	Print x0 if OP is zero, otherwise print OP normally.
+-   'i'	Print i if the operand is not a register.  */
++   'i'	Print i if the operand is not a register.
++   's'  Sign-extend a 32-bit constant value to 64-bits then print.
++   'S'  Print shift-index of single-bit mask OP.  */
+ 
+ static void
+ riscv_print_operand (FILE *file, rtx op, int letter)
+@@ -3297,6 +3343,27 @@ riscv_print_operand (FILE *file, rtx op, int letter)
+         fputs ("i", file);
+       break;
+ 
++    case 's':
++      {
++	rtx newop = GEN_INT (INTVAL (op) | 0xffffffffUL << 32);
++	output_addr_const (file, newop);
++	break;
++      }
++
++    case 'S':
++      {
++	rtx newop = GEN_INT (ctz_hwi (INTVAL (op)));
++	output_addr_const (file, newop);
++	break;
++      }
++
++    case 'T':
++      {
++	rtx newop = GEN_INT (ctz_hwi (~INTVAL (op)));
++	output_addr_const (file, newop);
++	break;
++      }
++	
+     default:
+       switch (code)
+ 	{
+diff --git a/gcc/config/riscv/riscv.h b/gcc/config/riscv/riscv.h
+index 5fc9be8edbf..33bc568f13f 100644
+--- a/gcc/config/riscv/riscv.h
++++ b/gcc/config/riscv/riscv.h
+@@ -461,6 +461,18 @@ enum reg_class
+   (((VALUE) | ((1UL<<31) - IMM_REACH)) == ((1UL<<31) - IMM_REACH)	\
+    || ((VALUE) | ((1UL<<31) - IMM_REACH)) + IMM_REACH == 0)
+ 
++/* The following macros use B extension instructions to load constants.  */
++
++/* If this is a negative 32-bit value zero-extended to 64-bits, then we
++   can load it with addiwu if it is close enough to -1.  */
++#define ZERO_EXTENDED_SMALL_OPERAND(VALUE) \
++  (((VALUE & 0xffffffff) == VALUE) && (VALUE & 0x80000000)		\
++   && SMALL_OPERAND (VALUE | (0xffffffffUL << 32)))
++
++/* If this is a single bit mask, then we can load it with sbseti.  */
++#define SINGLE_BIT_MASK_OPERAND(VALUE) \
++  (pow2p_hwi (VALUE))
++
+ /* Stack layout; function entry, exit and calling.  */
+ 
+ #define STACK_GROWS_DOWNWARD 1
+@@ -680,6 +692,13 @@ typedef struct {
+ 
+ #define LOGICAL_OP_NON_SHORT_CIRCUIT 0
+ 
++/* Configure CLZ/CTZ behavior. */
++
++#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
++  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
++#define CTZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
++  ((VALUE) = GET_MODE_UNIT_BITSIZE (MODE), 2)
++
+ /* Control the assembler format that we output.  */
+ 
+ /* Output to assembler file text saying following lines
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index d3c8f659748..b28471dd1d9 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -43,6 +43,9 @@
+   UNSPEC_LRINT
+   UNSPEC_LROUND
+ 
++  ;; Bitmanip
++  UNSPEC_PCNTW
++
+   ;; Stack tie
+   UNSPEC_TIE
+ ])
+@@ -156,7 +159,7 @@
+ (define_attr "type"
+   "unknown,branch,jump,call,load,fpload,store,fpstore,
+    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
+-   fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost"
++   fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip"
+   (cond [(eq_attr "got" "load") (const_string "load")
+ 
+ 	 ;; If a doubleword move uses these expensive instructions,
+@@ -1043,11 +1046,16 @@
+ 
+ ;; Extension insns.
+ 
+-(define_insn_and_split "zero_extendsidi2"
++(define_expand "zero_extendsidi2"
++  [(set (match_operand:DI 0 "register_operand")
++	(zero_extend:DI (match_operand:SI 1 "nonimmediate_operand")))]
++  "TARGET_64BIT")
++
++(define_insn_and_split "*zero_extendsidi2_internal"
+   [(set (match_operand:DI     0 "register_operand"     "=r,r")
+ 	(zero_extend:DI
+ 	    (match_operand:SI 1 "nonimmediate_operand" " r,m")))]
+-  "TARGET_64BIT"
++  "TARGET_64BIT && !TARGET_BITMANIP"
+   "@
+    #
+    lwu\t%0,%1"
+@@ -1062,11 +1070,15 @@
+   [(set_attr "move_type" "shift_shift,load")
+    (set_attr "mode" "DI")])
+ 
+-(define_insn_and_split "zero_extendhi<GPR:mode>2"
++(define_expand "zero_extendhi<GPR:mode>2"
++  [(set (match_operand:GPR 0 "register_operand")
++	(zero_extend:GPR (match_operand:HI 1 "nonimmediate_operand")))])
++
++(define_insn_and_split "*zero_extendhi<GPR:mode>2_internal"
+   [(set (match_operand:GPR    0 "register_operand"     "=r,r")
+ 	(zero_extend:GPR
+ 	    (match_operand:HI 1 "nonimmediate_operand" " r,m")))]
+-  ""
++  "!TARGET_BITMANIP"
+   "@
+    #
+    lhu\t%0,%1"
+@@ -2424,6 +2436,14 @@
+   ""
+   "")
+ 
++(define_insn "riscv_pcntw"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(unspec
++	    [(match_operand:SI 1 "register_operand" "r")]
++	    UNSPEC_PCNTW))]
++  ""
++  "pcntw\t%0,%1")
++
+ (define_insn "riscv_frflags"
+   [(set (match_operand:SI 0 "register_operand" "=r")
+ 	(unspec_volatile [(const_int 0)] UNSPECV_FRFLAGS))]
+@@ -2462,6 +2482,7 @@
+   ""
+   [(set_attr "length" "0")]
+ )
++(include "bitmanip.md")
+ 
+ ;; This fixes a failure with gcc.c-torture/execute/pr64242.c at -O2 for a
+ ;; 32-bit target when using -mtune=sifive-7-series.  The first sched pass
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 7f0c35e9e9c..f8e4f12028a 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -118,6 +118,8 @@ Mask(64BIT)
+ 
+ Mask(MUL)
+ 
++Mask(BITMANIP)
++
+ Mask(ATOMIC)
+ 
+ Mask(HARD_FLOAT)
+diff --git a/gcc/config/riscv/rvintrin.h b/gcc/config/riscv/rvintrin.h
+new file mode 100644
+index 00000000000..0010a56607c
+--- /dev/null
++++ b/gcc/config/riscv/rvintrin.h
+@@ -0,0 +1,1033 @@
++/*
++ *  RISC-V "B" extension proposal intrinsics and emulation
++ *
++ *  Copyright (C) 2019  Clifford Wolf <clifford@clifford.at>
++ *
++ *  Permission to use, copy, modify, and/or distribute this software for any
++ *  purpose with or without fee is hereby granted, provided that the above
++ *  copyright notice and this permission notice appear in all copies.
++ *
++ *  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ *  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ *  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ *  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ *  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ *  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ *  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ *  ----------------------------------------------------------------------
++ *
++ *  Define RVINTRIN_EMULATE to enable emulation mode.
++ *
++ *  This header defines C inline functions with "mockup intrinsics" for
++ *  RISC-V "B" extension proposal instructions.
++ *
++ *  _rv_*(...)
++ *    RV32/64 intrinsics that operate on the "long" data type
++ *
++ *  _rv32_*(...)
++ *    RV32/64 intrinsics that operate on the "int32_t" data type
++ *
++ *  _rv64_*(...)
++ *    RV64-only intrinsics that operate on the "int64_t" data type
++ *
++ */
++
++#ifndef RVINTRIN_H
++#define RVINTRIN_H
++
++#include <limits.h>
++#include <stdint.h>
++
++#if !defined(__riscv_xlen) && !defined(RVINTRIN_EMULATE)
++#  warning "Target is not RISC-V. Enabling <rvintrin.h> emulation mode."
++#  define RVINTRIN_EMULATE 1
++#endif
++
++#ifndef RVINTRIN_EMULATE
++
++#if __riscv_xlen == 32
++#  define RVINTRIN_RV32
++#endif
++
++#if __riscv_xlen == 64
++#  define RVINTRIN_RV64
++#endif
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_clz   (int32_t rs1) { int32_t rd; __asm__ ("clz     %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_ctz   (int32_t rs1) { int32_t rd; __asm__ ("ctz     %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_pcnt  (int32_t rs1) { int32_t rd; __asm__ ("pcnt    %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_sext_b(int32_t rs1) { int32_t rd; __asm__ ("sext.b  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_sext_h(int32_t rs1) { int32_t rd; __asm__ ("sext.h  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_clz   (int32_t rs1) { int32_t rd; __asm__ ("clzw    %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_ctz   (int32_t rs1) { int32_t rd; __asm__ ("ctzw    %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_pcnt  (int32_t rs1) { int32_t rd; __asm__ ("pcntw   %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_sext_b(int32_t rs1) { int32_t rd; __asm__ ("sext.b  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv32_sext_h(int32_t rs1) { int32_t rd; __asm__ ("sext.h  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++
++static inline int64_t _rv64_clz   (int64_t rs1) { int64_t rd; __asm__ ("clz     %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int64_t _rv64_ctz   (int64_t rs1) { int64_t rd; __asm__ ("ctz     %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int64_t _rv64_pcnt  (int64_t rs1) { int64_t rd; __asm__ ("pcnt    %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv64_sext_b(int32_t rs1) { int32_t rd; __asm__ ("sext.b  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int32_t _rv64_sext_h(int32_t rs1) { int32_t rd; __asm__ ("sext.h  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_pack (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("pack  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_packu(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("packu %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_packh(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("packh %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_bfp  (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("bfp   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_pack (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("packw  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_packu(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("packuw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_packh(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("packh  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_bfp  (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("bfpw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++static inline int64_t _rv64_pack (int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("pack  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_packu(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("packu %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_packh(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("packh %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_bfp  (int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("bfp   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++static inline int32_t _rv32_min (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("min  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_minu(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("minu %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_max (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("max  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_maxu(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("maxu %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++#ifdef RVINTRIN_RV64
++static inline int64_t _rv64_min (int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("min  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_minu(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("minu %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_max (int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("max  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_maxu(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("maxu %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_sbset (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbseti %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbset %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sbclr (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbclri %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbclr %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sbinv (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbinvi %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbinv %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sbext (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbexti %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbext %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_sbset (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbsetiw %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbsetw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sbclr (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbclriw %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbclrw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sbinv (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbinviw %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbinvw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sbext (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbexti  %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & rs2)); else __asm__ ("sbextw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++static inline int64_t _rv64_sbset (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbseti %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 & rs2)); else __asm__ ("sbset %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_sbclr (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbclri %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 & rs2)); else __asm__ ("sbclr %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_sbinv (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbinvi %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 & rs2)); else __asm__ ("sbinv %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_sbext (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sbexti %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 & rs2)); else __asm__ ("sbext %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_sll    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("slli    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("sll     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_srl    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("srli    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("srl     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sra    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("srai    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("sra     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_slo    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sloi    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("slo     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sro    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sroi    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("sro     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_rol    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("rori    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & -rs2)); else __asm__ ("rol     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_ror    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("rori    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("ror     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_grev   (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("grevi   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("grev    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_gorc   (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("gorci   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("gorc    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_shfl   (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("shfli   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(15 &  rs2)); else __asm__ ("shfl    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_unshfl (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("unshfli %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(15 &  rs2)); else __asm__ ("unshfl  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_sll    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("slliw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("sllw    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_srl    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("srliw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("srlw    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sra    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sraiw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("sraw    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_slo    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sloiw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("slow    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_sro    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sroiw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("srow    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_rol    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("roriw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 & -rs2)); else __asm__ ("rolw    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_ror    (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("roriw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("rorw    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_grev   (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("greviw  %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("grevw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_gorc   (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("gorciw  %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("gorcw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_shfl   (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("shfli   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(15 &  rs2)); else __asm__ ("shflw   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_unshfl (int32_t rs1, int32_t rs2) { int32_t rd; if (__builtin_constant_p(rs2)) __asm__ ("unshfli %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(15 &  rs2)); else __asm__ ("unshflw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++static inline int64_t _rv64_sll    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("slli    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("sll     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_srl    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("srli    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("srl     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_sra    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("srai    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("sra     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_slo    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sloi    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("slo     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_sro    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("sroi    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("sro     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_rol    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("rori    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 & -rs2)); else __asm__ ("rol     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_ror    (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("rori    %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("ror     %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_grev   (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("grevi   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("grev    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_gorc   (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("gorci   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(63 &  rs2)); else __asm__ ("gorc    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_shfl   (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("shfli   %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("shfl    %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_unshfl (int64_t rs1, int64_t rs2) { int64_t rd; if (__builtin_constant_p(rs2)) __asm__ ("unshfli %0, %1, %2" : "=r"(rd) : "r"(rs1), "i"(31 &  rs2)); else __asm__ ("unshfl  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_bext(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("bext  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_bdep(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("bdep  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_bext(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("bextw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_bdep(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("bdepw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++static inline int64_t _rv64_bext(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("bext  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_bdep(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("bdep  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_clmul (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("clmul   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_clmulh(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("clmulh  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_clmulr(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("clmulr  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_clmul (int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("clmulw  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_clmulh(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("clmulhw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int32_t _rv32_clmulr(int32_t rs1, int32_t rs2) { int32_t rd; __asm__ ("clmulrw %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++static inline int64_t _rv64_clmul (int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("clmul   %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_clmulh(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("clmulh  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_clmulr(int64_t rs1, int64_t rs2) { int64_t rd; __asm__ ("clmulr  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++static inline long _rv_crc32_b (long rs1) { long rd; __asm__ ("crc32.b  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline long _rv_crc32_h (long rs1) { long rd; __asm__ ("crc32.h  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline long _rv_crc32_w (long rs1) { long rd; __asm__ ("crc32.w  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++
++static inline long _rv_crc32c_b(long rs1) { long rd; __asm__ ("crc32c.b %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline long _rv_crc32c_h(long rs1) { long rd; __asm__ ("crc32c.h %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline long _rv_crc32c_w(long rs1) { long rd; __asm__ ("crc32c.w %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++
++#ifdef RVINTRIN_RV64
++static inline long _rv_crc32_d (long rs1) { long rd; __asm__ ("crc32.d  %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline long _rv_crc32c_d(long rs1) { long rd; __asm__ ("crc32c.d %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int64_t _rv64_bmatflip(int64_t rs1) { long rd; __asm__ ("bmatflip %0, %1" : "=r"(rd) : "r"(rs1)); return rd; }
++static inline int64_t _rv64_bmator  (int64_t rs1, int64_t rs2) { long rd; __asm__ ("bmator  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline int64_t _rv64_bmatxor (int64_t rs1, int64_t rs2) { long rd; __asm__ ("bmatxor %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++#endif
++
++static inline long _rv_cmix(long rs2, long rs1, long rs3) { long rd; __asm__ ("cmix %0, %1, %2, %3" : "=r"(rd) : "r"(rs2), "r"(rs1), "r"(rs3)); return rd; }
++static inline long _rv_cmov(long rs2, long rs1, long rs3) { long rd; __asm__ ("cmov %0, %1, %2, %3" : "=r"(rd) : "r"(rs2), "r"(rs1), "r"(rs3)); return rd; }
++
++#ifdef RVINTRIN_RV32
++static inline int32_t _rv32_fsl(int32_t rs1, int32_t rs3, int32_t rs2)
++{
++	int32_t rd;
++	if (__builtin_constant_p(rs2)) {
++		rs2 &= 63;
++		if (rs2 < 32)
++			__asm__ ("fsli  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "i"(rs2));
++		else
++			__asm__ ("fsli  %0, %1, %2, %3" : "=r"(rd) : "r"(rs3), "r"(rs1), "i"(rs2 & 31));
++	} else {
++		__asm__ ("fsl  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "r"(rs2));
++	}
++	return rd;
++}
++
++static inline int32_t _rv32_fsr(int32_t rs1, int32_t rs3, int32_t rs2)
++{
++	int32_t rd;
++	if (__builtin_constant_p(rs2)) {
++		rs2 &= 63;
++		if (rs2 < 32)
++			__asm__ ("fsri  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "i"(rs2));
++		else
++			__asm__ ("fsri  %0, %1, %2, %3" : "=r"(rd) : "r"(rs3), "r"(rs1), "i"(rs2 & 31));
++	} else {
++		__asm__ ("fsr  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "r"(rs2));
++	}
++	return rd;
++}
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline int32_t _rv32_fsl(int32_t rs1, int32_t rs3, int32_t rs2)
++{
++	int32_t rd;
++	if (__builtin_constant_p(rs2)) {
++		rs2 &= 63;
++		if (rs2 < 32)
++			__asm__ ("fsliw %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "i"(rs2));
++		else
++			__asm__ ("fsliw %0, %1, %2, %3" : "=r"(rd) : "r"(rs3), "r"(rs1), "i"(rs2 & 31));
++	} else {
++		__asm__ ("fslw %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "r"(rs2));
++	}
++	return rd;
++}
++
++static inline int32_t _rv32_fsr(int32_t rs1, int32_t rs3, int32_t rs2)
++{
++	int32_t rd;
++	if (__builtin_constant_p(rs2)) {
++		rs2 &= 63;
++		if (rs2 < 32)
++			__asm__ ("fsriw %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "i"(rs2));
++		else
++			__asm__ ("fsriw %0, %1, %2, %3" : "=r"(rd) : "r"(rs3), "r"(rs1), "i"(rs2 & 31));
++	} else {
++		__asm__ ("fsrw %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "r"(rs2));
++	}
++	return rd;
++}
++
++static inline int64_t _rv64_fsl(int64_t rs1, int64_t rs3, int64_t rs2)
++{
++	int64_t rd;
++	if (__builtin_constant_p(rs2)) {
++		rs2 &= 127;
++		if (rs2 < 64)
++			__asm__ ("fsli  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "i"(rs2));
++		else
++			__asm__ ("fsli  %0, %1, %2, %3" : "=r"(rd) : "r"(rs3), "r"(rs1), "i"(rs2 & 63));
++	} else {
++		__asm__ ("fsl  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "r"(rs2));
++	}
++	return rd;
++}
++
++static inline int64_t _rv64_fsr(int64_t rs1, int64_t rs3, int64_t rs2)
++{
++	int64_t rd;
++	if (__builtin_constant_p(rs2)) {
++		rs2 &= 127;
++		if (rs2 < 64)
++			__asm__ ("fsri  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "i"(rs2));
++		else
++			__asm__ ("fsri  %0, %1, %2, %3" : "=r"(rd) : "r"(rs3), "r"(rs1), "i"(rs2 & 63));
++	} else {
++		__asm__ ("fsr  %0, %1, %2, %3" : "=r"(rd) : "r"(rs1), "r"(rs3), "r"(rs2));
++	}
++	return rd;
++}
++#endif
++
++static inline long _rv_andn(long rs1, long rs2) { long rd; __asm__ ("andn %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline long _rv_orn (long rs1, long rs2) { long rd; __asm__ ("orn  %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++static inline long _rv_xnor(long rs1, long rs2) { long rd; __asm__ ("xnor %0, %1, %2" : "=r"(rd) : "r"(rs1), "r"(rs2)); return rd; }
++
++#else // RVINTRIN_EMULATE
++
++#if UINT_MAX != 0xffffffffU
++#  error "<rvintrin.h> emulation mode only supports systems with sizeof(int) = 4."
++#endif
++
++#if (ULLONG_MAX == 0xffffffffLLU) || (ULLONG_MAX != 0xffffffffffffffffLLU)
++#  error "<rvintrin.h> emulation mode only supports systems with sizeof(long long) = 8."
++#endif
++
++#if UINT_MAX == ULONG_MAX
++#  define RVINTRIN_RV32
++#else
++#  define RVINTRIN_RV64
++#endif
++
++#ifdef RVINTRIN_NOBUILTINS
++static inline int32_t _rv32_clz(int32_t rs1) { for (int i=0; i < 32; i++) { if (1 & (rs1 >> (31-i))) return i; } return 32; }
++static inline int64_t _rv64_clz(int64_t rs1) { for (int i=0; i < 64; i++) { if (1 & (rs1 >> (63-i))) return i; } return 64; }
++
++static inline int32_t _rv32_ctz(int32_t rs1) { for (int i=0; i < 32; i++) { if (1 & (rs1 >> i)) return i; } return 32; }
++static inline int64_t _rv64_ctz(int64_t rs1) { for (int i=0; i < 64; i++) { if (1 & (rs1 >> i)) return i; } return 64; }
++
++static inline int32_t _rv32_pcnt(int32_t rs1) { int k=0; for (int i=0; i < 32; i++) { if (1 & (rs1 >> i)) k++; } return k; }
++static inline int64_t _rv64_pcnt(int64_t rs1) { int k=0; for (int i=0; i < 64; i++) { if (1 & (rs1 >> i)) k++; } return k; }
++#else
++static inline int32_t _rv32_clz(int32_t rs1) { return rs1 ? __builtin_clz(rs1)   : 32; }
++static inline int64_t _rv64_clz(int64_t rs1) { return rs1 ? __builtin_clzll(rs1) : 64; }
++
++static inline int32_t _rv32_ctz(int32_t rs1) { return rs1 ? __builtin_ctz(rs1)   : 32; }
++static inline int64_t _rv64_ctz(int64_t rs1) { return rs1 ? __builtin_ctzll(rs1) : 64; }
++
++static inline int32_t _rv32_pcnt(int32_t rs1) { return __builtin_popcount(rs1);   }
++static inline int64_t _rv64_pcnt(int64_t rs1) { return __builtin_popcountll(rs1); }
++#endif
++
++static inline int32_t _rv32_sext_b(int32_t rs1) { return rs1 << (32-8) >> (32-8); }
++static inline int64_t _rv64_sext_b(int64_t rs1) { return rs1 << (64-8) >> (64-8); }
++
++static inline int32_t _rv32_sext_h(int32_t rs1) { return rs1 << (32-16) >> (32-16); }
++static inline int64_t _rv64_sext_h(int64_t rs1) { return rs1 << (64-16) >> (64-16); }
++
++static inline int32_t _rv32_pack(int32_t rs1, int32_t rs2) { return (rs1 & 0x0000ffff)   | (rs2 << 16); }
++static inline int64_t _rv64_pack(int64_t rs1, int64_t rs2) { return (rs1 & 0xffffffffLL) | (rs2 << 32); }
++
++static inline int32_t _rv32_packu(int32_t rs1, int32_t rs2) { return ((rs1 >> 16) & 0x0000ffff)   | (rs2 >> 16 << 16); }
++static inline int64_t _rv64_packu(int64_t rs1, int64_t rs2) { return ((rs1 >> 32) & 0xffffffffLL) | (rs2 >> 32 << 32); }
++
++static inline int32_t _rv32_packh(int32_t rs1, int32_t rs2) { return (rs1 & 0xff) | ((rs2 & 0xff) << 8); }
++static inline int64_t _rv64_packh(int64_t rs1, int64_t rs2) { return (rs1 & 0xff) | ((rs2 & 0xff) << 8); }
++
++static inline int32_t _rv32_min (int32_t rs1, int32_t rs2) { return rs1 < rs2 ? rs1 : rs2; }
++static inline int32_t _rv32_minu(int32_t rs1, int32_t rs2) { return (uint32_t)rs1 < (uint32_t)rs2 ? rs1 : rs2; }
++static inline int32_t _rv32_max (int32_t rs1, int32_t rs2) { return rs1 > rs2 ? rs1 : rs2; }
++static inline int32_t _rv32_maxu(int32_t rs1, int32_t rs2) { return (uint32_t)rs1 > (uint32_t)rs2 ? rs1 : rs2; }
++
++static inline int64_t _rv64_min (int64_t rs1, int64_t rs2) { return rs1 < rs2 ? rs1 : rs2; }
++static inline int64_t _rv64_minu(int64_t rs1, int64_t rs2) { return (uint64_t)rs1 < (uint64_t)rs2 ? rs1 : rs2; }
++static inline int64_t _rv64_max (int64_t rs1, int64_t rs2) { return rs1 > rs2 ? rs1 : rs2; }
++static inline int64_t _rv64_maxu(int64_t rs1, int64_t rs2) { return (uint64_t)rs1 > (uint64_t)rs2 ? rs1 : rs2; }
++
++static inline int32_t _rv32_sbset (int32_t rs1, int32_t rs2) { return rs1 |  (1   << (rs2 & 31)); }
++static inline int32_t _rv32_sbclr (int32_t rs1, int32_t rs2) { return rs1 & ~(1   << (rs2 & 31)); }
++static inline int32_t _rv32_sbinv (int32_t rs1, int32_t rs2) { return rs1 ^  (1   << (rs2 & 31)); }
++static inline int32_t _rv32_sbext (int32_t rs1, int32_t rs2) { return 1   &  (rs1 >> (rs2 & 31)); }
++
++static inline int64_t _rv64_sbset (int64_t rs1, int64_t rs2) { return rs1 |  (1LL << (rs2 & 63)); }
++static inline int64_t _rv64_sbclr (int64_t rs1, int64_t rs2) { return rs1 & ~(1LL << (rs2 & 63)); }
++static inline int64_t _rv64_sbinv (int64_t rs1, int64_t rs2) { return rs1 ^  (1LL << (rs2 & 63)); }
++static inline int64_t _rv64_sbext (int64_t rs1, int64_t rs2) { return 1LL &  (rs1 >> (rs2 & 63)); }
++
++static inline int32_t _rv32_sll    (int32_t rs1, int32_t rs2) { return rs1 << (rs2 & 31); }
++static inline int32_t _rv32_srl    (int32_t rs1, int32_t rs2) { return (uint32_t)rs1 >> (rs2 & 31); }
++static inline int32_t _rv32_sra    (int32_t rs1, int32_t rs2) { return rs1 >> (rs2 & 31); }
++static inline int32_t _rv32_slo    (int32_t rs1, int32_t rs2) { return ~(~rs1 << (rs2 & 31)); }
++static inline int32_t _rv32_sro    (int32_t rs1, int32_t rs2) { return ~(~(uint32_t)rs1 >> (rs2 & 31)); }
++static inline int32_t _rv32_rol    (int32_t rs1, int32_t rs2) { return _rv32_sll(rs1, rs2) | _rv32_srl(rs1, -rs2); }
++static inline int32_t _rv32_ror    (int32_t rs1, int32_t rs2) { return _rv32_srl(rs1, rs2) | _rv32_sll(rs1, -rs2); }
++
++static inline int32_t _rv32_bfp(int32_t rs1, int32_t rs2)
++{
++	uint32_t cfg = rs2 >> 16;
++	int len = (cfg >> 8) & 15;
++	int off = cfg & 31;
++	len = len ? len : 16;
++	uint32_t mask = _rv32_slo(0, len) << off;
++	uint32_t data = rs2 << off;
++	return (data & mask) | (rs1 & ~mask);
++}
++
++static inline int32_t _rv32_grev(int32_t rs1, int32_t rs2)
++{
++	uint32_t x = rs1;
++	int shamt = rs2 & 31;
++	if (shamt &  1) x = ((x & 0x55555555) <<  1) | ((x & 0xAAAAAAAA) >>  1);
++	if (shamt &  2) x = ((x & 0x33333333) <<  2) | ((x & 0xCCCCCCCC) >>  2);
++	if (shamt &  4) x = ((x & 0x0F0F0F0F) <<  4) | ((x & 0xF0F0F0F0) >>  4);
++	if (shamt &  8) x = ((x & 0x00FF00FF) <<  8) | ((x & 0xFF00FF00) >>  8);
++	if (shamt & 16) x = ((x & 0x0000FFFF) << 16) | ((x & 0xFFFF0000) >> 16);
++	return x;
++}
++
++static inline int32_t _rv32_gorc(int32_t rs1, int32_t rs2)
++{
++	uint32_t x = rs1;
++	int shamt = rs2 & 31;
++	if (shamt &  1) x |= ((x & 0x55555555) <<  1) | ((x & 0xAAAAAAAA) >>  1);
++	if (shamt &  2) x |= ((x & 0x33333333) <<  2) | ((x & 0xCCCCCCCC) >>  2);
++	if (shamt &  4) x |= ((x & 0x0F0F0F0F) <<  4) | ((x & 0xF0F0F0F0) >>  4);
++	if (shamt &  8) x |= ((x & 0x00FF00FF) <<  8) | ((x & 0xFF00FF00) >>  8);
++	if (shamt & 16) x |= ((x & 0x0000FFFF) << 16) | ((x & 0xFFFF0000) >> 16);
++	return x;
++}
++
++static inline uint32_t _rvintrin_shuffle32_stage(uint32_t src, uint32_t maskL, uint32_t maskR, int N)
++{
++	uint32_t x = src & ~(maskL | maskR);
++	x |= ((src <<  N) & maskL) | ((src >>  N) & maskR);
++	return x;
++}
++
++static inline int32_t _rv32_shfl(int32_t rs1, int32_t rs2)
++{
++	uint32_t x = rs1;
++	int shamt = rs2 & 15;
++
++	if (shamt & 8) x = _rvintrin_shuffle32_stage(x, 0x00ff0000, 0x0000ff00, 8);
++	if (shamt & 4) x = _rvintrin_shuffle32_stage(x, 0x0f000f00, 0x00f000f0, 4);
++	if (shamt & 2) x = _rvintrin_shuffle32_stage(x, 0x30303030, 0x0c0c0c0c, 2);
++	if (shamt & 1) x = _rvintrin_shuffle32_stage(x, 0x44444444, 0x22222222, 1);
++
++	return x;
++}
++
++static inline int32_t _rv32_unshfl(int32_t rs1, int32_t rs2)
++{
++	uint32_t x = rs1;
++	int shamt = rs2 & 15;
++
++	if (shamt & 1) x = _rvintrin_shuffle32_stage(x, 0x44444444, 0x22222222, 1);
++	if (shamt & 2) x = _rvintrin_shuffle32_stage(x, 0x30303030, 0x0c0c0c0c, 2);
++	if (shamt & 4) x = _rvintrin_shuffle32_stage(x, 0x0f000f00, 0x00f000f0, 4);
++	if (shamt & 8) x = _rvintrin_shuffle32_stage(x, 0x00ff0000, 0x0000ff00, 8);
++
++	return x;
++}
++
++static inline int64_t _rv64_sll    (int64_t rs1, int64_t rs2) { return rs1 << (rs2 & 63); }
++static inline int64_t _rv64_srl    (int64_t rs1, int64_t rs2) { return (uint64_t)rs1 >> (rs2 & 63); }
++static inline int64_t _rv64_sra    (int64_t rs1, int64_t rs2) { return rs1 >> (rs2 & 63); }
++static inline int64_t _rv64_slo    (int64_t rs1, int64_t rs2) { return ~(~rs1 << (rs2 & 63)); }
++static inline int64_t _rv64_sro    (int64_t rs1, int64_t rs2) { return ~(~(uint64_t)rs1 >> (rs2 & 63)); }
++static inline int64_t _rv64_rol    (int64_t rs1, int64_t rs2) { return _rv64_sll(rs1, rs2) | _rv64_srl(rs1, -rs2); }
++static inline int64_t _rv64_ror    (int64_t rs1, int64_t rs2) { return _rv64_srl(rs1, rs2) | _rv64_sll(rs1, -rs2); }
++
++static inline int64_t _rv64_bfp(int64_t rs1, int64_t rs2)
++{
++	uint64_t cfg = (uint64_t)rs2 >> 32;
++	if ((cfg >> 30) == 2)
++		cfg = cfg >> 16;
++	int len = (cfg >> 8) & 31;
++	int off = cfg & 63;
++	len = len ? len : 32;
++	uint64_t mask = _rv64_slo(0, len) << off;
++	uint64_t data = rs2 << off;
++	return (data & mask) | (rs1 & ~mask);
++}
++
++static inline int64_t _rv64_grev(int64_t rs1, int64_t rs2)
++{
++	uint64_t x = rs1;
++	int shamt = rs2 & 63;
++	if (shamt &  1) x = ((x & 0x5555555555555555LL) <<  1) | ((x & 0xAAAAAAAAAAAAAAAALL) >>  1);
++	if (shamt &  2) x = ((x & 0x3333333333333333LL) <<  2) | ((x & 0xCCCCCCCCCCCCCCCCLL) >>  2);
++	if (shamt &  4) x = ((x & 0x0F0F0F0F0F0F0F0FLL) <<  4) | ((x & 0xF0F0F0F0F0F0F0F0LL) >>  4);
++	if (shamt &  8) x = ((x & 0x00FF00FF00FF00FFLL) <<  8) | ((x & 0xFF00FF00FF00FF00LL) >>  8);
++	if (shamt & 16) x = ((x & 0x0000FFFF0000FFFFLL) << 16) | ((x & 0xFFFF0000FFFF0000LL) >> 16);
++	if (shamt & 32) x = ((x & 0x00000000FFFFFFFFLL) << 32) | ((x & 0xFFFFFFFF00000000LL) >> 32);
++	return x;
++}
++
++static inline int64_t _rv64_gorc(int64_t rs1, int64_t rs2)
++{
++	uint64_t x = rs1;
++	int shamt = rs2 & 63;
++	if (shamt &  1) x |= ((x & 0x5555555555555555LL) <<  1) | ((x & 0xAAAAAAAAAAAAAAAALL) >>  1);
++	if (shamt &  2) x |= ((x & 0x3333333333333333LL) <<  2) | ((x & 0xCCCCCCCCCCCCCCCCLL) >>  2);
++	if (shamt &  4) x |= ((x & 0x0F0F0F0F0F0F0F0FLL) <<  4) | ((x & 0xF0F0F0F0F0F0F0F0LL) >>  4);
++	if (shamt &  8) x |= ((x & 0x00FF00FF00FF00FFLL) <<  8) | ((x & 0xFF00FF00FF00FF00LL) >>  8);
++	if (shamt & 16) x |= ((x & 0x0000FFFF0000FFFFLL) << 16) | ((x & 0xFFFF0000FFFF0000LL) >> 16);
++	if (shamt & 32) x |= ((x & 0x00000000FFFFFFFFLL) << 32) | ((x & 0xFFFFFFFF00000000LL) >> 32);
++	return x;
++}
++
++static inline uint64_t _rvintrin_shuffle64_stage(uint64_t src, uint64_t maskL, uint64_t maskR, int N)
++{
++	uint64_t x = src & ~(maskL | maskR);
++	x |= ((src <<  N) & maskL) | ((src >>  N) & maskR);
++	return x;
++}
++
++static inline int64_t _rv64_shfl(int64_t rs1, int64_t rs2)
++{
++	uint64_t x = rs1;
++	int shamt = rs2 & 31;
++	if (shamt & 16) x = _rvintrin_shuffle64_stage(x, 0x0000ffff00000000LL, 0x00000000ffff0000LL, 16);
++	if (shamt &  8) x = _rvintrin_shuffle64_stage(x, 0x00ff000000ff0000LL, 0x0000ff000000ff00LL,  8);
++	if (shamt &  4) x = _rvintrin_shuffle64_stage(x, 0x0f000f000f000f00LL, 0x00f000f000f000f0LL,  4);
++	if (shamt &  2) x = _rvintrin_shuffle64_stage(x, 0x3030303030303030LL, 0x0c0c0c0c0c0c0c0cLL,  2);
++	if (shamt &  1) x = _rvintrin_shuffle64_stage(x, 0x4444444444444444LL, 0x2222222222222222LL,  1);
++	return x;
++}
++
++static inline int64_t _rv64_unshfl(int64_t rs1, int64_t rs2)
++{
++	uint64_t x = rs1;
++	int shamt = rs2 & 31;
++	if (shamt &  1) x = _rvintrin_shuffle64_stage(x, 0x4444444444444444LL, 0x2222222222222222LL,  1);
++	if (shamt &  2) x = _rvintrin_shuffle64_stage(x, 0x3030303030303030LL, 0x0c0c0c0c0c0c0c0cLL,  2);
++	if (shamt &  4) x = _rvintrin_shuffle64_stage(x, 0x0f000f000f000f00LL, 0x00f000f000f000f0LL,  4);
++	if (shamt &  8) x = _rvintrin_shuffle64_stage(x, 0x00ff000000ff0000LL, 0x0000ff000000ff00LL,  8);
++	if (shamt & 16) x = _rvintrin_shuffle64_stage(x, 0x0000ffff00000000LL, 0x00000000ffff0000LL, 16);
++	return x;
++}
++
++static inline int32_t _rv32_bext(int32_t rs1, int32_t rs2)
++{
++	uint32_t c = 0, i = 0, data = rs1, mask = rs2;
++	while (mask) {
++		uint32_t b = mask & ~((mask | (mask-1)) + 1);
++		c |= (data & b) >> (_rv32_ctz(b) - i);
++		i += _rv32_pcnt(b);
++		mask -= b;
++	}
++	return c;
++}
++
++static inline int32_t _rv32_bdep(int32_t rs1, int32_t rs2)
++{
++	uint32_t c = 0, i = 0, data = rs1, mask = rs2;
++	while (mask) {
++		uint32_t b = mask & ~((mask | (mask-1)) + 1);
++		c |= (data << (_rv32_ctz(b) - i)) & b;
++		i += _rv32_pcnt(b);
++		mask -= b;
++	}
++	return c;
++}
++
++static inline int64_t _rv64_bext(int64_t rs1, int64_t rs2)
++{
++	uint64_t c = 0, i = 0, data = rs1, mask = rs2;
++	while (mask) {
++		uint64_t b = mask & ~((mask | (mask-1)) + 1);
++		c |= (data & b) >> (_rv64_ctz(b) - i);
++		i += _rv64_pcnt(b);
++		mask -= b;
++	}
++	return c;
++}
++
++static inline int64_t _rv64_bdep(int64_t rs1, int64_t rs2)
++{
++	uint64_t c = 0, i = 0, data = rs1, mask = rs2;
++	while (mask) {
++		uint64_t b = mask & ~((mask | (mask-1)) + 1);
++		c |= (data << (_rv64_ctz(b) - i)) & b;
++		i += _rv64_pcnt(b);
++		mask -= b;
++	}
++	return c;
++}
++
++static inline int32_t _rv32_clmul(int32_t rs1, int32_t rs2)
++{
++	uint32_t a = rs1, b = rs2, x = 0;
++	for (int i = 0; i < 32; i++)
++		if ((b >> i) & 1)
++			x ^= a << i;
++	return x;
++}
++
++static inline int32_t _rv32_clmulh(int32_t rs1, int32_t rs2)
++{
++	uint32_t a = rs1, b = rs2, x = 0;
++	for (int i = 1; i < 32; i++)
++		if ((b >> i) & 1)
++			x ^= a >> (32-i);
++	return x;
++}
++
++static inline int32_t _rv32_clmulr(int32_t rs1, int32_t rs2)
++{
++	uint32_t a = rs1, b = rs2, x = 0;
++	for (int i = 0; i < 32; i++)
++		if ((b >> i) & 1)
++			x ^= a >> (31-i);
++	return x;
++}
++
++static inline int64_t _rv64_clmul(int64_t rs1, int64_t rs2)
++{
++	uint64_t a = rs1, b = rs2, x = 0;
++	for (int i = 0; i < 64; i++)
++		if ((b >> i) & 1)
++			x ^= a << i;
++	return x;
++}
++
++static inline int64_t _rv64_clmulh(int64_t rs1, int64_t rs2)
++{
++	uint64_t a = rs1, b = rs2, x = 0;
++	for (int i = 1; i < 64; i++)
++		if ((b >> i) & 1)
++			x ^= a >> (64-i);
++	return x;
++}
++
++static inline int64_t _rv64_clmulr(int64_t rs1, int64_t rs2)
++{
++	uint64_t a = rs1, b = rs2, x = 0;
++	for (int i = 0; i < 64; i++)
++		if ((b >> i) & 1)
++			x ^= a >> (63-i);
++	return x;
++}
++
++static inline long _rvintrin_crc32(unsigned long x, int nbits)
++{
++	for (int i = 0; i < nbits; i++)
++		x = (x >> 1) ^ (0xEDB88320 & ~((x&1)-1));
++	return x;
++}
++
++static inline long _rvintrin_crc32c(unsigned long x, int nbits)
++{
++	for (int i = 0; i < nbits; i++)
++		x = (x >> 1) ^ (0x82F63B78 & ~((x&1)-1));
++	return x;
++}
++
++static inline long _rv_crc32_b(long rs1) { return _rvintrin_crc32(rs1, 8); }
++static inline long _rv_crc32_h(long rs1) { return _rvintrin_crc32(rs1, 16); }
++static inline long _rv_crc32_w(long rs1) { return _rvintrin_crc32(rs1, 32); }
++
++static inline long _rv_crc32c_b(long rs1) { return _rvintrin_crc32c(rs1, 8); }
++static inline long _rv_crc32c_h(long rs1) { return _rvintrin_crc32c(rs1, 16); }
++static inline long _rv_crc32c_w(long rs1) { return _rvintrin_crc32c(rs1, 32); }
++
++#ifdef RVINTRIN_RV64
++static inline long _rv_crc32_d (long rs1) { return _rvintrin_crc32 (rs1, 64); }
++static inline long _rv_crc32c_d(long rs1) { return _rvintrin_crc32c(rs1, 64); }
++#endif
++
++static inline int64_t _rv64_bmatflip(int64_t rs1)
++{
++	uint64_t x = rs1;
++	x = _rv64_shfl(x, 31);
++	x = _rv64_shfl(x, 31);
++	x = _rv64_shfl(x, 31);
++	return x;
++}
++
++static inline int64_t _rv64_bmatxor(int64_t rs1, int64_t rs2)
++{
++	// transpose of rs2
++	int64_t rs2t = _rv64_bmatflip(rs2);
++
++	uint8_t u[8]; // rows of rs1
++	uint8_t v[8]; // cols of rs2
++
++	for (int i = 0; i < 8; i++) {
++		u[i] = rs1 >> (i*8);
++		v[i] = rs2t >> (i*8);
++	}
++
++	uint64_t x = 0;
++	for (int i = 0; i < 64; i++) {
++		if (_rv64_pcnt(u[i / 8] & v[i % 8]) & 1)
++			x |= 1LL << i;
++	}
++
++	return x;
++}
++
++static inline int64_t _rv64_bmator(int64_t rs1, int64_t rs2)
++{
++	// transpose of rs2
++	int64_t rs2t = _rv64_bmatflip(rs2);
++
++	uint8_t u[8]; // rows of rs1
++	uint8_t v[8]; // cols of rs2
++
++	for (int i = 0; i < 8; i++) {
++		u[i] = rs1 >> (i*8);
++		v[i] = rs2t >> (i*8);
++	}
++
++	uint64_t x = 0;
++	for (int i = 0; i < 64; i++) {
++		if ((u[i / 8] & v[i % 8]) != 0)
++			x |= 1LL << i;
++	}
++
++	return x;
++}
++
++static inline long _rv_cmix(long rs2, long rs1, long rs3)
++{
++	return (rs1 & rs2) | (rs3 & ~rs2);
++}
++
++static inline long _rv_cmov(long rs2, long rs1, long rs3)
++{
++	return rs2 ? rs1 : rs3;
++}
++
++static inline int32_t _rv32_fsl(int32_t rs1, int32_t rs3, int32_t rs2)
++{
++	int shamt = rs2 & 63;
++	uint32_t A = rs1, B = rs3;
++	if (shamt >= 32) {
++		shamt -= 32;
++		A = rs3;
++		B = rs1;
++	}
++	return shamt ? (A << shamt) | (B >> (32-shamt)) : A;
++}
++
++static inline int32_t _rv32_fsr(int32_t rs1, int32_t rs3, int32_t rs2)
++{
++	int shamt = rs2 & 63;
++	uint32_t A = rs1, B = rs3;
++	if (shamt >= 32) {
++		shamt -= 32;
++		A = rs3;
++		B = rs1;
++	}
++	return shamt ? (A >> shamt) | (B << (32-shamt)) : A;
++}
++
++static inline int64_t _rv64_fsl(int64_t rs1, int64_t rs3, int64_t rs2)
++{
++	int shamt = rs2 & 127;
++	uint64_t A = rs1, B = rs3;
++	if (shamt >= 64) {
++		shamt -= 64;
++		A = rs3;
++		B = rs1;
++	}
++	return shamt ? (A << shamt) | (B >> (64-shamt)) : A;
++}
++
++static inline int64_t _rv64_fsr(int64_t rs1, int64_t rs3, int64_t rs2)
++{
++	int shamt = rs2 & 127;
++	uint64_t A = rs1, B = rs3;
++	if (shamt >= 64) {
++		shamt -= 64;
++		A = rs3;
++		B = rs1;
++	}
++	return shamt ? (A >> shamt) | (B << (64-shamt)) : A;
++}
++
++static inline long _rv_andn(long rs1, long rs2) { return rs1 & ~rs2; }
++static inline long _rv_orn (long rs1, long rs2) { return rs1 | ~rs2; }
++static inline long _rv_xnor(long rs1, long rs2) { return rs1 ^ ~rs2; }
++
++#endif // RVINTRIN_EMULATE
++
++#ifdef RVINTRIN_RV32
++static inline long _rv_clz    (long rs1) { return _rv32_clz   (rs1); }
++static inline long _rv_ctz    (long rs1) { return _rv32_ctz   (rs1); }
++static inline long _rv_pcnt   (long rs1) { return _rv32_pcnt  (rs1); }
++static inline long _rv_sext_b (long rs1) { return _rv32_sext_b(rs1); }
++static inline long _rv_sext_h (long rs1) { return _rv32_sext_h(rs1); }
++
++static inline long _rv_pack   (long rs1, long rs2) { return _rv32_pack   (rs1, rs2); }
++static inline long _rv_packu  (long rs1, long rs2) { return _rv32_packu  (rs1, rs2); }
++static inline long _rv_packh  (long rs1, long rs2) { return _rv32_packh  (rs1, rs2); }
++static inline long _rv_bfp    (long rs1, long rs2) { return _rv32_bfp    (rs1, rs2); }
++static inline long _rv_min    (long rs1, long rs2) { return _rv32_min    (rs1, rs2); }
++static inline long _rv_minu   (long rs1, long rs2) { return _rv32_minu   (rs1, rs2); }
++static inline long _rv_max    (long rs1, long rs2) { return _rv32_max    (rs1, rs2); }
++static inline long _rv_maxu   (long rs1, long rs2) { return _rv32_maxu   (rs1, rs2); }
++static inline long _rv_sbset  (long rs1, long rs2) { return _rv32_sbset  (rs1, rs2); }
++static inline long _rv_sbclr  (long rs1, long rs2) { return _rv32_sbclr  (rs1, rs2); }
++static inline long _rv_sbinv  (long rs1, long rs2) { return _rv32_sbinv  (rs1, rs2); }
++static inline long _rv_sbext  (long rs1, long rs2) { return _rv32_sbext  (rs1, rs2); }
++static inline long _rv_sll    (long rs1, long rs2) { return _rv32_sll    (rs1, rs2); }
++static inline long _rv_srl    (long rs1, long rs2) { return _rv32_srl    (rs1, rs2); }
++static inline long _rv_sra    (long rs1, long rs2) { return _rv32_sra    (rs1, rs2); }
++static inline long _rv_slo    (long rs1, long rs2) { return _rv32_slo    (rs1, rs2); }
++static inline long _rv_sro    (long rs1, long rs2) { return _rv32_sro    (rs1, rs2); }
++static inline long _rv_rol    (long rs1, long rs2) { return _rv32_rol    (rs1, rs2); }
++static inline long _rv_ror    (long rs1, long rs2) { return _rv32_ror    (rs1, rs2); }
++static inline long _rv_grev   (long rs1, long rs2) { return _rv32_grev   (rs1, rs2); }
++static inline long _rv_gorc   (long rs1, long rs2) { return _rv32_gorc   (rs1, rs2); }
++static inline long _rv_shfl   (long rs1, long rs2) { return _rv32_shfl   (rs1, rs2); }
++static inline long _rv_unshfl (long rs1, long rs2) { return _rv32_unshfl (rs1, rs2); }
++static inline long _rv_bext   (long rs1, long rs2) { return _rv32_bext   (rs1, rs2); }
++static inline long _rv_bdep   (long rs1, long rs2) { return _rv32_bdep   (rs1, rs2); }
++static inline long _rv_clmul  (long rs1, long rs2) { return _rv32_clmul  (rs1, rs2); }
++static inline long _rv_clmulh (long rs1, long rs2) { return _rv32_clmulh (rs1, rs2); }
++static inline long _rv_clmulr (long rs1, long rs2) { return _rv32_clmulr (rs1, rs2); }
++
++static inline long _rv_fsl(long rs1, long rs3, long rs2) { return _rv32_fsl(rs1, rs3, rs2); }
++static inline long _rv_fsr(long rs1, long rs3, long rs2) { return _rv32_fsr(rs1, rs3, rs2); }
++#endif
++
++#ifdef RVINTRIN_RV64
++static inline long _rv_clz     (long rs1) { return _rv64_clz     (rs1); }
++static inline long _rv_ctz     (long rs1) { return _rv64_ctz     (rs1); }
++static inline long _rv_pcnt    (long rs1) { return _rv64_pcnt    (rs1); }
++static inline long _rv_sext_b  (long rs1) { return _rv64_sext_b  (rs1); }
++static inline long _rv_sext_h  (long rs1) { return _rv64_sext_h  (rs1); }
++static inline long _rv_bmatflip(long rs1) { return _rv64_bmatflip(rs1); }
++
++static inline long _rv_pack   (long rs1, long rs2) { return _rv64_pack   (rs1, rs2); }
++static inline long _rv_packu  (long rs1, long rs2) { return _rv64_packu  (rs1, rs2); }
++static inline long _rv_packh  (long rs1, long rs2) { return _rv64_packh  (rs1, rs2); }
++static inline long _rv_bfp    (long rs1, long rs2) { return _rv64_bfp    (rs1, rs2); }
++static inline long _rv_min    (long rs1, long rs2) { return _rv64_min    (rs1, rs2); }
++static inline long _rv_minu   (long rs1, long rs2) { return _rv64_minu   (rs1, rs2); }
++static inline long _rv_max    (long rs1, long rs2) { return _rv64_max    (rs1, rs2); }
++static inline long _rv_maxu   (long rs1, long rs2) { return _rv64_maxu   (rs1, rs2); }
++static inline long _rv_sbset  (long rs1, long rs2) { return _rv64_sbset  (rs1, rs2); }
++static inline long _rv_sbclr  (long rs1, long rs2) { return _rv64_sbclr  (rs1, rs2); }
++static inline long _rv_sbinv  (long rs1, long rs2) { return _rv64_sbinv  (rs1, rs2); }
++static inline long _rv_sbext  (long rs1, long rs2) { return _rv64_sbext  (rs1, rs2); }
++static inline long _rv_sll    (long rs1, long rs2) { return _rv64_sll    (rs1, rs2); }
++static inline long _rv_srl    (long rs1, long rs2) { return _rv64_srl    (rs1, rs2); }
++static inline long _rv_sra    (long rs1, long rs2) { return _rv64_sra    (rs1, rs2); }
++static inline long _rv_slo    (long rs1, long rs2) { return _rv64_slo    (rs1, rs2); }
++static inline long _rv_sro    (long rs1, long rs2) { return _rv64_sro    (rs1, rs2); }
++static inline long _rv_rol    (long rs1, long rs2) { return _rv64_rol    (rs1, rs2); }
++static inline long _rv_ror    (long rs1, long rs2) { return _rv64_ror    (rs1, rs2); }
++static inline long _rv_grev   (long rs1, long rs2) { return _rv64_grev   (rs1, rs2); }
++static inline long _rv_gorc   (long rs1, long rs2) { return _rv64_gorc   (rs1, rs2); }
++static inline long _rv_shfl   (long rs1, long rs2) { return _rv64_shfl   (rs1, rs2); }
++static inline long _rv_unshfl (long rs1, long rs2) { return _rv64_unshfl (rs1, rs2); }
++static inline long _rv_bext   (long rs1, long rs2) { return _rv64_bext   (rs1, rs2); }
++static inline long _rv_bdep   (long rs1, long rs2) { return _rv64_bdep   (rs1, rs2); }
++static inline long _rv_clmul  (long rs1, long rs2) { return _rv64_clmul  (rs1, rs2); }
++static inline long _rv_clmulh (long rs1, long rs2) { return _rv64_clmulh (rs1, rs2); }
++static inline long _rv_clmulr (long rs1, long rs2) { return _rv64_clmulr (rs1, rs2); }
++static inline long _rv_bmator (long rs1, long rs2) { return _rv64_bmator (rs1, rs2); }
++static inline long _rv_bmatxor(long rs1, long rs2) { return _rv64_bmatxor(rs1, rs2); }
++
++static inline long _rv_fsl(long rs1, long rs3, long rs2) { return _rv64_fsl(rs1, rs3, rs2); }
++static inline long _rv_fsr(long rs1, long rs3, long rs2) { return _rv64_fsr(rs1, rs3, rs2); }
++#endif
++
++#ifdef RVINTRIN_RV32
++
++#define RVINTRIN_GREV_PSEUDO_OP32(_arg, _name) \
++	static inline long    _rv_   ## _name(long    rs1) { return _rv_grev  (rs1, _arg); } \
++	static inline int32_t _rv32_ ## _name(int32_t rs1) { return _rv32_grev(rs1, _arg); }
++
++#define RVINTRIN_GREV_PSEUDO_OP64(_arg, _name)
++
++#else
++
++#define RVINTRIN_GREV_PSEUDO_OP32(_arg, _name) \
++	static inline int32_t _rv32_ ## _name(int32_t rs1) { return _rv32_grev(rs1, _arg); }
++
++#define RVINTRIN_GREV_PSEUDO_OP64(_arg, _name) \
++	static inline long    _rv_   ## _name(long    rs1) { return _rv_grev  (rs1, _arg); } \
++	static inline int64_t _rv64_ ## _name(int64_t rs1) { return _rv64_grev(rs1, _arg); }
++#endif
++
++RVINTRIN_GREV_PSEUDO_OP32( 1, rev_p)
++RVINTRIN_GREV_PSEUDO_OP32( 2, rev2_n)
++RVINTRIN_GREV_PSEUDO_OP32( 3, rev_n)
++RVINTRIN_GREV_PSEUDO_OP32( 4, rev4_b)
++RVINTRIN_GREV_PSEUDO_OP32( 6, rev2_b)
++RVINTRIN_GREV_PSEUDO_OP32( 7, rev_b)
++RVINTRIN_GREV_PSEUDO_OP32( 8, rev8_h)
++RVINTRIN_GREV_PSEUDO_OP32(12, rev4_h)
++RVINTRIN_GREV_PSEUDO_OP32(14, rev2_h)
++RVINTRIN_GREV_PSEUDO_OP32(15, rev_h)
++RVINTRIN_GREV_PSEUDO_OP32(16, rev16)
++RVINTRIN_GREV_PSEUDO_OP32(24, rev8)
++RVINTRIN_GREV_PSEUDO_OP32(28, rev4)
++RVINTRIN_GREV_PSEUDO_OP32(30, rev2)
++RVINTRIN_GREV_PSEUDO_OP32(31, rev)
++
++RVINTRIN_GREV_PSEUDO_OP64( 1, rev_p)
++RVINTRIN_GREV_PSEUDO_OP64( 2, rev2_n)
++RVINTRIN_GREV_PSEUDO_OP64( 3, rev_n)
++RVINTRIN_GREV_PSEUDO_OP64( 4, rev4_b)
++RVINTRIN_GREV_PSEUDO_OP64( 6, rev2_b)
++RVINTRIN_GREV_PSEUDO_OP64( 7, rev_b)
++RVINTRIN_GREV_PSEUDO_OP64( 8, rev8_h)
++RVINTRIN_GREV_PSEUDO_OP64(12, rev4_h)
++RVINTRIN_GREV_PSEUDO_OP64(14, rev2_h)
++RVINTRIN_GREV_PSEUDO_OP64(15, rev_h)
++RVINTRIN_GREV_PSEUDO_OP64(16, rev16_w)
++RVINTRIN_GREV_PSEUDO_OP64(24, rev8_w)
++RVINTRIN_GREV_PSEUDO_OP64(28, rev4_w)
++RVINTRIN_GREV_PSEUDO_OP64(30, rev2_w)
++RVINTRIN_GREV_PSEUDO_OP64(31, rev_w)
++RVINTRIN_GREV_PSEUDO_OP64(32, rev32)
++RVINTRIN_GREV_PSEUDO_OP64(48, rev16)
++RVINTRIN_GREV_PSEUDO_OP64(56, rev8)
++RVINTRIN_GREV_PSEUDO_OP64(60, rev4)
++RVINTRIN_GREV_PSEUDO_OP64(62, rev2)
++RVINTRIN_GREV_PSEUDO_OP64(63, rev)
++
++#ifdef RVINTRIN_RV32
++
++#define RVINTRIN_GORC_PSEUDO_OP32(_arg, _name) \
++	static inline long    _rv_   ## _name(long    rs1) { return _rv_gorc  (rs1, _arg); } \
++	static inline int32_t _rv32_ ## _name(int32_t rs1) { return _rv32_gorc(rs1, _arg); }
++
++#define RVINTRIN_GORC_PSEUDO_OP64(_arg, _name)
++
++#else
++
++#define RVINTRIN_GORC_PSEUDO_OP32(_arg, _name) \
++	static inline int32_t _rv32_ ## _name(int32_t rs1) { return _rv32_gorc(rs1, _arg); }
++
++#define RVINTRIN_GORC_PSEUDO_OP64(_arg, _name) \
++	static inline long    _rv_   ## _name(long    rs1) { return _rv_gorc  (rs1, _arg); } \
++	static inline int64_t _rv64_ ## _name(int64_t rs1) { return _rv64_gorc(rs1, _arg); }
++#endif
++
++RVINTRIN_GORC_PSEUDO_OP32( 1, orc_p)
++RVINTRIN_GORC_PSEUDO_OP32( 2, orc2_n)
++RVINTRIN_GORC_PSEUDO_OP32( 3, orc_n)
++RVINTRIN_GORC_PSEUDO_OP32( 4, orc4_b)
++RVINTRIN_GORC_PSEUDO_OP32( 6, orc2_b)
++RVINTRIN_GORC_PSEUDO_OP32( 7, orc_b)
++RVINTRIN_GORC_PSEUDO_OP32( 8, orc8_h)
++RVINTRIN_GORC_PSEUDO_OP32(12, orc4_h)
++RVINTRIN_GORC_PSEUDO_OP32(14, orc2_h)
++RVINTRIN_GORC_PSEUDO_OP32(15, orc_h)
++RVINTRIN_GORC_PSEUDO_OP32(16, orc16)
++RVINTRIN_GORC_PSEUDO_OP32(24, orc8)
++RVINTRIN_GORC_PSEUDO_OP32(28, orc4)
++RVINTRIN_GORC_PSEUDO_OP32(30, orc2)
++RVINTRIN_GORC_PSEUDO_OP32(31, orc)
++
++RVINTRIN_GORC_PSEUDO_OP64( 1, orc_p)
++RVINTRIN_GORC_PSEUDO_OP64( 2, orc2_n)
++RVINTRIN_GORC_PSEUDO_OP64( 3, orc_n)
++RVINTRIN_GORC_PSEUDO_OP64( 4, orc4_b)
++RVINTRIN_GORC_PSEUDO_OP64( 6, orc2_b)
++RVINTRIN_GORC_PSEUDO_OP64( 7, orc_b)
++RVINTRIN_GORC_PSEUDO_OP64( 8, orc8_h)
++RVINTRIN_GORC_PSEUDO_OP64(12, orc4_h)
++RVINTRIN_GORC_PSEUDO_OP64(14, orc2_h)
++RVINTRIN_GORC_PSEUDO_OP64(15, orc_h)
++RVINTRIN_GORC_PSEUDO_OP64(16, orc16_w)
++RVINTRIN_GORC_PSEUDO_OP64(24, orc8_w)
++RVINTRIN_GORC_PSEUDO_OP64(28, orc4_w)
++RVINTRIN_GORC_PSEUDO_OP64(30, orc2_w)
++RVINTRIN_GORC_PSEUDO_OP64(31, orc_w)
++RVINTRIN_GORC_PSEUDO_OP64(32, orc32)
++RVINTRIN_GORC_PSEUDO_OP64(48, orc16)
++RVINTRIN_GORC_PSEUDO_OP64(56, orc8)
++RVINTRIN_GORC_PSEUDO_OP64(60, orc4)
++RVINTRIN_GORC_PSEUDO_OP64(62, orc2)
++RVINTRIN_GORC_PSEUDO_OP64(63, orc)
++
++#ifdef RVINTRIN_RV32
++
++#define RVINTRIN_SHFL_PSEUDO_OP32(_arg, _name) \
++	static inline long    _rv_     ## _name(long    rs1) { return _rv_shfl    (rs1, _arg); } \
++	static inline long    _rv_un   ## _name(long    rs1) { return _rv_unshfl  (rs1, _arg); } \
++	static inline int32_t _rv32_un ## _name(int32_t rs1) { return _rv32_shfl  (rs1, _arg); } \
++	static inline int32_t _rv32_   ## _name(int32_t rs1) { return _rv32_unshfl(rs1, _arg); }
++
++#define RVINTRIN_SHFL_PSEUDO_OP64(_arg, _name)
++
++#else
++
++#define RVINTRIN_SHFL_PSEUDO_OP32(_arg, _name)
++
++#define RVINTRIN_SHFL_PSEUDO_OP64(_arg, _name) \
++	static inline long    _rv_     ## _name(long    rs1) { return _rv_shfl    (rs1, _arg); } \
++	static inline long    _rv_un   ## _name(long    rs1) { return _rv_unshfl  (rs1, _arg); } \
++	static inline int64_t _rv64_   ## _name(int64_t rs1) { return _rv64_shfl  (rs1, _arg); } \
++	static inline int64_t _rv64_un ## _name(int64_t rs1) { return _rv64_unshfl(rs1, _arg); }
++
++#endif
++
++RVINTRIN_SHFL_PSEUDO_OP32( 1, zip_n)
++RVINTRIN_SHFL_PSEUDO_OP32( 2, zip2_b)
++RVINTRIN_SHFL_PSEUDO_OP32( 3, zip_b)
++RVINTRIN_SHFL_PSEUDO_OP32( 4, zip4_h)
++RVINTRIN_SHFL_PSEUDO_OP32( 6, zip2_h)
++RVINTRIN_SHFL_PSEUDO_OP32( 7, zip_h)
++RVINTRIN_SHFL_PSEUDO_OP32( 8, zip8)
++RVINTRIN_SHFL_PSEUDO_OP32(12, zip4)
++RVINTRIN_SHFL_PSEUDO_OP32(14, zip2)
++RVINTRIN_SHFL_PSEUDO_OP32(15, zip)
++
++RVINTRIN_SHFL_PSEUDO_OP64( 1, zip_n)
++RVINTRIN_SHFL_PSEUDO_OP64( 2, zip2_b)
++RVINTRIN_SHFL_PSEUDO_OP64( 3, zip_b)
++RVINTRIN_SHFL_PSEUDO_OP64( 4, zip4_h)
++RVINTRIN_SHFL_PSEUDO_OP64( 6, zip2_h)
++RVINTRIN_SHFL_PSEUDO_OP64( 7, zip_h)
++RVINTRIN_SHFL_PSEUDO_OP64( 8, zip8_w)
++RVINTRIN_SHFL_PSEUDO_OP64(12, zip4_w)
++RVINTRIN_SHFL_PSEUDO_OP64(14, zip2_w)
++RVINTRIN_SHFL_PSEUDO_OP64(15, zip_w)
++RVINTRIN_SHFL_PSEUDO_OP64(16, zip16)
++RVINTRIN_SHFL_PSEUDO_OP64(24, zip8)
++RVINTRIN_SHFL_PSEUDO_OP64(28, zip4)
++RVINTRIN_SHFL_PSEUDO_OP64(30, zip2)
++RVINTRIN_SHFL_PSEUDO_OP64(31, zip)
++
++#endif // RVINTRIN_H
