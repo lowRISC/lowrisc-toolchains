@@ -47,13 +47,22 @@ How to do a release
 How to generate the bitmanip patches
 ------------------------------------
 
-1. Generate the binutils patch.
+1. Generate the binutils patch:
 
    ```
    git clone https://github.com/riscv/riscv-binutils-gdb.git
    cd riscv-binutils-gdb
    git checkout riscv-bitmanip
-   git diff 612aac65 > 001-bitmanip.patch # 612aac65 is our upstream baseline
+   # 612aac65 is our upstream baseline
+   git diff 612aac65 > $TOP/patches/binutils/git-612aac65/001-bitmanip.patch
    ```
 
-2. Generate the GCC patch: TODO.
+2. Generate the GCC patch:
+
+   ```
+   git clone https://github.com/riscv/riscv-gcc.git
+   cd riscv-gcc
+   git checkout riscv-bitmanip
+   # 49f75e008c0 is our upstream baseline
+   git diff 49f75e008c0 > $TOP/patches/gcc/git-49f75e00/001-bitmanip.patch
+   ```
