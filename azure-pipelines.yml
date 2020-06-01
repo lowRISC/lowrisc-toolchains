@@ -49,6 +49,41 @@ jobs:
     parameters:
       azure_name: rv32imc-toolchains
 
+- job: "Toolchains_RV32IMCB"
+  displayName: "GCC and Clang/LLVM toolchains targeting RV32IMC+B (Ibex with Bit Manipulation)"
+  pool:
+    vmImage: "ubuntu-16.04"
+  timeoutInMinutes: 360
+  steps:
+  - template: "_build-deps.yml"
+
+  - bash: |
+      ./build-gcc-with-args.sh \
+        "lowrisc-toolchain-gcc-rv32imcb" \
+        "riscv32-unknown-elf" \
+        "/tools/riscv" \
+        "-march=rv32imcb" "-mabi=ilp32" "-mcmodel=medany"
+    displayName: 'Build GCC toolchain'
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
+
+  - bash: |
+      ./build-clang-with-args.sh \
+        "lowrisc-toolchain-rv32imcb" \
+        "riscv32-unknown-elf" \
+        "/tools/riscv" \
+        "-march=rv32imcb0p92" "-mabi=ilp32" "-mcmodel=medany" \
+        "-menable-experimental-extensions"
+    displayName: "Build Clang toolchain"
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
+
+  - template: "_upload-artifacts.yml"
+    parameters:
+      azure_name: rv32imcb-toolchains
+
 - job: "GCC_Multilib_Baremetal"
   displayName: "RV64 GCC (Multilib Baremetal)"
   condition: false
