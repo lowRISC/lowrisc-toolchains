@@ -171,6 +171,7 @@ BUILDINFO
 tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
 {
   "toolchain_config": "${toolchain_name}",
+  "kind: "combined",
   "version": "${tag_name}",
   "clang_version": "${clang_version_string}",
   "clang_git": "${LLVM_VERSION}",
