@@ -39,12 +39,7 @@ build_top_dir="${PWD}"
 # shellcheck source=sw-versions.sh
 source "${build_top_dir}/sw-versions.sh"
 
-git -C "${build_top_dir}" fetch --tags
-tag_name="$(git -C "${build_top_dir}" describe --always)"
-set +x
-echo "##vso[task.setvariable variable=ReleaseTag]${tag_name}"
-set -x
-
+tag_name="${RELEASE_TAG:-HEAD}"
 toolchain_full_name="${toolchain_name}-${tag_name}"
 
 # crosstools-NG needs the ability to create and chmod the

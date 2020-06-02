@@ -15,5 +15,7 @@ steps:
     addChangeLog: false
     assetUploadMode: replace
     isPreRelease: true
+    # To ensure assets match the tag we're uploading to, we only upload assets
+    # that end with `$(ReleaseTag).tar.xz`
     assets: |
-        $(Build.ArtifactStagingDirectory)/*.tar.xz
+      $(Build.ArtifactStagingDirectory)/*-$(ReleaseTag).tar.xz

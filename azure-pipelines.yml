@@ -32,6 +32,7 @@ jobs:
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
 
   - bash: |
       ./build-clang-with-args.sh \
@@ -42,6 +43,7 @@ jobs:
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
 
   - template: "_upload-artifacts.yml"
     parameters:
@@ -64,6 +66,7 @@ jobs:
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
 
   - bash: |
       ./build-clang-with-args.sh \
@@ -73,6 +76,7 @@ jobs:
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
 
   - template: "_upload-artifacts.yml"
     parameters:
@@ -95,6 +99,7 @@ jobs:
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
 
   - bash: |
       ./build-clang-with-args.sh \
@@ -104,6 +109,7 @@ jobs:
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
 
   - template: "_upload-artifacts.yml"
     parameters:
