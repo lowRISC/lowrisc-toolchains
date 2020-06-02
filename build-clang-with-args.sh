@@ -42,6 +42,7 @@ build_top_dir="${PWD}"
 # shellcheck source=sw-versions.sh
 source "${build_top_dir}/sw-versions.sh"
 
+git -C "${build_top_dir}" fetch --tags
 tag_name="$(git -C "${build_top_dir}" describe --always)"
 toolchain_full_name="${toolchain_name}-${tag_name}"
 
