@@ -184,10 +184,12 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
 }
 BUILDINFO_JSON
 
+artifact_dir="${ARTIFACT_STAGING_DIR:-${build_top_dir}/build}"
+
 # Package up toolchain directory
 tar -cJ \
   --directory="$(dirname "${toolchain_dest}")" \
-  -f "$ARTIFACT_STAGING_DIR/$toolchain_full_name.tar.xz" \
+  -f "${artifact_dir}/${toolchain_full_name}.tar.xz" \
   --transform="s@$(basename "${toolchain_dest}")@$toolchain_full_name@" \
   --owner=0 --group=0 \
   "$(basename "${toolchain_dest}")"
