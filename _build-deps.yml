@@ -16,6 +16,7 @@ steps:
 
 - bash: |
     set -e
+    set -x
     git fetch --tags
 
     # git-describe --always almost does what we want, but we need to connect the
@@ -43,5 +44,6 @@ steps:
       tag_name="$(git describe --long)"
     fi
 
+    set +x
     echo "##vso[task.setvariable variable=ReleaseTag]${tag_name}"
   displayName: 'Set ReleaseTag'
