@@ -118,6 +118,8 @@ cmake --build "${llvm_build_dir}" \
   --parallel $(( $(nproc) + 2 )) \
   --target install-distribution
 
+cd "${build_top_dir}"
+
 ## Create Toolchain Files!
 # These don't yet add cflags ldflags
 "${build_top_dir}/generate-clang-cmake-toolchain.sh" \
@@ -184,11 +186,12 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
 }
 BUILDINFO_JSON
 
+# If `ARTIFACT_STAGING_DIR` is not set, we don't want to leave the final binary
+# in the root directory.
+artifact_dir="${ARTIFACT_STAGING_DIR:-${build_top_dir}/build}"
+
 # Package up toolchain directory
-tar -cJ \
-  --show-transformed-names --verbose \
-  --directory="$(dirname "${toolchain_dest}")" \
-  -f "$ARTIFACT_STAGING_DIR/$toolchain_full_name.tar.xz" \
-  --transform="flags=rhS;s@^$(basename "${toolchain_dest}")@$toolchain_full_name@" \
-  --owner=0 --group=0 \
-  "$(basename "${toolchain_dest}")"
+"${build_top_dir}/create-prefixed-archive.sh" \
+  "${toolchain_full_name}" \
+  "${toolchain_dest}" \
+  "${artifact_dir}"
