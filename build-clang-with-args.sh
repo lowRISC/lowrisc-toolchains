@@ -187,8 +187,9 @@ BUILDINFO_JSON
 
 # Package up toolchain directory
 tar -cJ \
+  --show-transformed-names --verbose \
   --directory="$(dirname "${toolchain_dest}")" \
   -f "$ARTIFACT_STAGING_DIR/$toolchain_full_name.tar.xz" \
-  --transform="s@$(basename "${toolchain_dest}")@$toolchain_full_name@" \
+  --transform="flags=rhS;s@^$(basename "${toolchain_dest}")@$toolchain_full_name@" \
   --owner=0 --group=0 \
   "$(basename "${toolchain_dest}")"
