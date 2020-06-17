@@ -3,6 +3,19 @@ steps:
   artifact: ${{ parameters.azure_name }}
   displayName: "Upload Azure Artifact"
 
+# This comes after uploading azure artifacts so we can debug the azure artifact
+# if this step fails.
+- bash: |
+    set -e
+    find "${ARTIFACT_STAGING_DIR}" \
+      -type f \
+      -name "*.tar.xz" \
+      -print0 \
+      | xargs -0 -n1 ./check-tarball-symlinks.sh
+  env:
+    ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+  displayName: "Checking Artifact Tarballs"
+
 - task: GithubRelease@0
   displayName: 'Upload GitHub Release (if tagged)'
   condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
