@@ -146,7 +146,7 @@ BUILDINFO
 tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
 {
   "toolchain_config": "${toolchain_name}",
-  "kind: "gcc-only",
+  "kind": "gcc-only",
   "version": "${tag_name}",
   "gcc_version": "${gcc_version_string}",
   "qemu_version": "${qemu_version_string}",
