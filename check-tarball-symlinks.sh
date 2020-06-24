@@ -20,6 +20,8 @@ fi;
 tarball="$1"
 tarball_dest="$(mktemp -d)"
 
+found_error=false
+
 echo "Checking: $1"
 
 # Extract tarball into `tarball_dest`
@@ -32,12 +34,24 @@ tar -x -v \
 broken_symlinks="$(mktemp)"
 
 # Check for broken symlinks
-echo "Broken Symlinks:"
+echo "Checking symlinks"
 find "${tarball_dest}" -type l \
   -exec test ! -e '{}' \; \
   -print | tee "${broken_symlinks}"
 
 if [ -s "${broken_symlinks}" ]; then
   echo "ERROR: Broken Symlinks Found"
+  found_error=true
+fi
+
+echo "Checking buidinfo.json"
+if ! python -mjson.tool "${tarball_dest}/buildinfo.json"; then
+  echo "ERROR: buildinfo.json not valid json"
+  found_error=true
+fi
+
+if [ "${found_error}" = "true" ]; then
   exit 1
+else
+  exit 0
 fi
