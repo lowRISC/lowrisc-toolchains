@@ -26,13 +26,18 @@ toolchain_dest="${2}"
 # Remaining cflags for build configurations
 toolchain_cflags=("${@:3}")
 
-# Clang requires a `--gcc-toolchain=<path>` argument to find some things
-meson_cflags="'--gcc-toolchain=${toolchain_dest}'"
+# Meson uses the driver when both compiling and linking, which may need flags to
+# identify exactly how to set up paths and defaults for both.
+#
+# In particular, the clang driver requires a `--gcc-toolchain=<path>` argument
+# to find the right libraries if there are system versions of the risc-v
+# toolchains installed.
+meson_driver_flags="'--gcc-toolchain=${toolchain_dest}'"
 for flag in "${toolchain_cflags[@]}"; do
-  if [ -z "${meson_cflags}" ]; then
-    meson_cflags+="'${flag}'";
+  if [ -z "${meson_driver_flags}" ]; then
+    meson_driver_flags+="'${flag}'";
   else
-    meson_cflags+=", '${flag}'"
+    meson_driver_flags+=", '${flag}'"
   fi
 done
 
@@ -69,8 +74,10 @@ strip = '${toolchain_dest}/bin/${toolchain_target}-strip'
 [properties]
 needs_exe_wrapper = true
 has_function_printf = false
-c_args = [${meson_cflags}]
-cpp_args = [${meson_cflags}]
+c_args = [${meson_driver_flags}]
+c_link_args = [${meson_driver_flags}]
+cpp_args = [${meson_driver_flags}]
+cpp_link_args = [${meson_driver_flags}]
 ${sysroot_config}
 
 [host_machine]
