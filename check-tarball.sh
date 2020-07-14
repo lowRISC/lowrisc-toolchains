@@ -3,10 +3,13 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-## check-tarball-symlinks.sh
+## check-tarball.sh
 #
 # Takes a tarball name and checks all symlinks resolve to an existing file. This
 # has been an issue we keep running into, so CI can now check it for us!
+#
+# It also checks that the `buildinfo.json` in the tarball is valid JSON, which
+# was an issue we ran into.
 
 set -e
 set -x

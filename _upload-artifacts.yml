@@ -11,7 +11,7 @@ steps:
       -type f \
       -name "*.tar.xz" \
       -print0 \
-      | xargs -0 -n1 ./check-tarball-symlinks.sh
+      | xargs -0 -n1 ./check-tarball.sh
   env:
     ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
   displayName: "Checking Artifact Tarballs"
