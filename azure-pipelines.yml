@@ -83,6 +83,40 @@ jobs:
   - template: "_upload-artifacts.yml"
     parameters:
       azure_name: rv32imcb-toolchains
+      
+- job: "Toolchains_RV64IMAC"
+  displayName: "GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)"
+  pool:
+    vmImage: "ubuntu-16.04"
+  timeoutInMinutes: 360
+  steps:
+  - template: "_build-deps.yml"
+
+  - bash: |
+      ./build-gcc-with-args.sh \
+        "lowrisc-toolchain-gcc-rv64imac" \
+        "riscv64-unknown-elf" \
+        "/tools/riscv" \
+        "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
+    displayName: 'Build GCC toolchain'
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
+
+  - bash: |
+      ./build-clang-with-args.sh \
+        "lowrisc-toolchain-rv64imac" \
+        "riscv64-unknown-elf" \
+        "/tools/riscv" \
+        "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
+    displayName: "Build Clang toolchain"
+    env:
+      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+      RELEASE_TAG: $(ReleaseTag)
+
+  - template: "_upload-artifacts.yml"
+    parameters:
+      azure_name: rv64imac-toolchains
 
 - job: "GCC_Multilib_Baremetal"
   displayName: "RV64 GCC (Multilib Baremetal)"
