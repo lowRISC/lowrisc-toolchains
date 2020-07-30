@@ -10,6 +10,7 @@ Head over to the
 for pre-built toolchains.
 
 * A GCC RV32IMC without hardfloat support, targeting [Ibex](https://github.com/lowRISC/ibex/)
+* A GCC RV64IMAC, targeting [Muntjac](https://github.com/lowRISC/muntjac)
 * A GCC elf multilib toolchain
 * A GCC linux multilib toolchain, with linux user-space Qemu binaries
 
