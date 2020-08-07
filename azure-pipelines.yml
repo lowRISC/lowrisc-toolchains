@@ -16,7 +16,7 @@ pr:
 
 jobs:
 - job: "Toolchains_RV32IMC"
-  displayName: "GCC and Clang/LLVM toolchains targeting RV32IMC (Ibex)"
+  displayName: "Toolchains targeting Ibex"
   pool:
     vmImage: "ubuntu-16.04"
   timeoutInMinutes: 360
@@ -50,7 +50,10 @@ jobs:
       azure_name: rv32imc-toolchains
 
 - job: "Toolchains_RV32IMCB"
-  displayName: "GCC and Clang/LLVM toolchains targeting RV32IMC+B (Ibex with Bit Manipulation)"
+  displayName: "Toolchains targeting Ibex with 'Balanced' Bit-manipulation"
+  # These builds are using the 'Balanced' bit-manipulation subset identified in
+  # https://github.com/lowRISC/opentitan/issues/2708, and formatted for the
+  # correct versions as implemented by clang (B 0.92).
   pool:
     vmImage: "ubuntu-16.04"
   timeoutInMinutes: 360
@@ -58,11 +61,31 @@ jobs:
   - template: "_build-deps.yml"
 
   - bash: |
+      # HACK: GCC does not allow you to compile with just a subset of the B
+      # extension using `-march=`, but it does assemble separately.
+      #
+      # So, we pass a more acceptable `-march=` to the assembler with `-Wa`.
+      #
+      # However, gcc will emit an assembly directive describing the arch it
+      # wanted when it compiled, which the assembler will use in spite of the
+      # `-march=` flag. So, we have to turn this off, using
+      # `-mno-riscv-attribute`.
+      #
+      # The end result is: The compiler will not introduce B extension
+      # instructions when compiling, but the assembler will understand them, so
+      # they can be used in inline assembly.
+      #
+      # If you update the patches in `patches/lowrisc-toolchain-gcc-rv32imcb`,
+      # you will need to revalidate that this behaviour works. A good testcase
+      # is a file with a `pcnt` instruction in inline assembly.
+      #
       ./build-gcc-with-args.sh \
         "lowrisc-toolchain-gcc-rv32imcb" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv32imcb" "-mabi=ilp32" "-mcmodel=medany"
+        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany" \
+        "-Wa,-march=rv32imczbb0p92_zbf0p92_zbs0p92_zbt0p92" \
+        "-mno-riscv-attribute"
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
@@ -73,8 +96,8 @@ jobs:
         "lowrisc-toolchain-rv32imcb" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv32imcb0p92" "-mabi=ilp32" "-mcmodel=medany" \
-        "-menable-experimental-extensions"
+        "-march=rv32imczbb0p92_zbf0p92_zbs0p92_zbt0p92" \
+        "-mabi=ilp32" "-mcmodel=medany" "-menable-experimental-extensions"
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
