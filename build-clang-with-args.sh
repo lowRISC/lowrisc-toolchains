@@ -70,6 +70,7 @@ cd "${llvm_build_dir}"
 # - Build compiler-rt and other runtimes
 
 llvm_tools="llvm-ar;"
+llvm_tools+="llvm-as;"
 llvm_tools+="llvm-cov;"
 llvm_tools+="llvm-dwarfdump;"
 llvm_tools+="llvm-nm;"

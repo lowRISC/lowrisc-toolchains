@@ -72,6 +72,7 @@ cpp_ld = '${toolchain_dest}/bin/${toolchain_target}-ld'
 objdump = '${toolchain_dest}/bin/${toolchain_target}-objdump'
 objcopy = '${toolchain_dest}/bin/${toolchain_target}-objcopy'
 strip = '${toolchain_dest}/bin/${toolchain_target}-strip'
+as = '${toolchain_dest}/bin/${toolchain_target}-as'
 
 [properties]
 needs_exe_wrapper = true
