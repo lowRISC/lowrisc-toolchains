@@ -10,7 +10,7 @@ build_top_dir="${PWD}"
 . "${build_top_dir}/sw-versions.sh"
 
 mkdir -p build && cd build || exit 1
-git clone https://github.com/lowRISC/crosstool-ng || exit 1
+git clone "${CROSSTOOL_NG_URL}" || exit 1
 cd crosstool-ng || exit 1
 git checkout --force "${CROSSTOOL_NG_VERSION}" || exit 1
 ./bootstrap || exit 1

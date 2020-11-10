@@ -2,8 +2,9 @@
 
 # This documents the versions of any software checked out from git
 
-# `lowrisc-golden` 2019-12-06
-export CROSSTOOL_NG_VERSION=475d72ff55dbcd77f091ceb37cc9749cd1006c97
+# `lenary/2020-Nov-Packages` 2020-11-10
+export CROSSTOOL_NG_URL=https://github.com/lowRISC/crosstool-ng.git
+export CROSSTOOL_NG_VERSION=lenary/2020-Nov-Packages
 
 export QEMU_VERSION=5.1.0
 
