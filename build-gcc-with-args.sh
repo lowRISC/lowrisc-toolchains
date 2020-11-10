@@ -113,7 +113,7 @@ GCC version:
 
 Crosstool-ng version:
   ${ct_ng_version_string}
-  (git: ${CROSSTOOL_NG_VERSION})
+  (git: ${CROSSTOOL_NG_URL} ${CROSSTOOL_NG_VERSION})
 
 C Flags:
   ${toolchain_cflags[@]}
@@ -128,6 +128,7 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "version": "${tag_name}",
   "gcc_version": "${gcc_version_string}",
   "crosstool-ng_version": "${ct_ng_version_string}",
+  "crosstool-ng_url": "${CROSSTOOL_NG_URL}",
   "crosstool-ng_git": "${CROSSTOOL_NG_VERSION}",
   "build_date": "${build_date}",
   "build_host": "$(hostname)"
