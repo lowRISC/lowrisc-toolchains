@@ -1,25 +1,5 @@
-# This installs the build dependencies for:
-# - using crosstool-ng to install a toolchain
-# - building qemu
-#
+# This sets the `ReleaseTag` for future steps
 steps:
-
-# Untranslated dependencies:
-# - libpixman-1-dev
-# - libglib2.0-dev
-- bash: |
-    su -- root -c 'yum install -y sudo'
-
-    source /hbb_exe/activate
-    sudo yum install -y bison flex texinfo help2man gawk ncurses-devel \
-      ncurses-static gettext wget curl libfdt-devel
-  displayName: 'Install build dependencies'
-
-- bash: |
-    source /hbb_exe/activate
-    ./install-crosstool-ng.sh
-  displayName: 'Build and install crosstool-ng'
-
 - bash: |
     set -e
     set -x

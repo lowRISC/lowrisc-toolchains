@@ -17,200 +17,157 @@ pr:
 resources:
   containers:
   - container: holy-build-box
-    image: phusion/holy-build-box-64:latest
+    image: 'lowRISC/toolchains-builder:$(Build.BuildId)'
+    containerRegistry: 'lowrisc-docker-upload'
 
-jobs:
-- job: "Toolchains_RV32IMC"
-  displayName: "Toolchains targeting Ibex"
-  pool:
-    vmImage: "ubuntu-16.04"
-  container: holy-build-box
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
+stages:
+- stage: build_container
+  displayName: "Build Container"
+  jobs:
+  - job: build_container
+    displayName: "Build HBB-Based Container"
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'lowrisc-docker-upload'
+        repository: 'lowRISC/toolchains-builder'
+        addPipelineData: false
+        command: buildAndPush
 
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-rv32imc" \
-        "riscv32-unknown-elf" \
-        "/tools/riscv" \
-        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+- stage: build_toolchain
+  displayName: "Build Toolchains"
 
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-rv32imc" \
-        "riscv32-unknown-elf" \
-        "/tools/riscv" \
-        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+  dependsOn:
+  - build_container
 
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: rv32imc-toolchains
+  jobs:
+  - job: "Toolchains_RV32IMC"
+    displayName: "Toolchains targeting Ibex"
+    pool:
+      vmImage: "ubuntu-16.04"
+    container: holy-build-box
+    timeoutInMinutes: 360
+    steps:
+    - template: "_build-deps.yml"
 
-- job: "Toolchains_RV32IMCB"
-  displayName: "Toolchains targeting Ibex with 'Balanced' Bit-manipulation"
-  # These builds are using the 'Balanced' bit-manipulation subset identified in
-  # https://github.com/lowRISC/opentitan/issues/2708, and formatted for the
-  # correct versions as implemented by clang (B 0.92).
-  pool:
-    vmImage: "ubuntu-16.04"
-  container: holy-build-box
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
+    - bash: |
+        ./build-gcc-with-args.sh \
+          "lowrisc-toolchain-gcc-rv32imc" \
+          "riscv32-unknown-elf" \
+          "/tools/riscv" \
+          "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
+      displayName: 'Build GCC toolchain'
+      env:
+        ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+        RELEASE_TAG: $(ReleaseTag)
 
-  - bash: |
-      # HACK: GCC does not allow you to compile with just a subset of the B
-      # extension using `-march=`, but it does assemble separately.
-      #
-      # So, we pass a more acceptable `-march=` to the assembler with `-Wa`.
-      #
-      # However, gcc will emit an assembly directive describing the arch it
-      # wanted when it compiled, which the assembler will use in spite of the
-      # `-march=` flag. So, we have to turn this off, using
-      # `-mno-riscv-attribute`.
-      #
-      # The end result is: The compiler will not introduce B extension
-      # instructions when compiling, but the assembler will understand them, so
-      # they can be used in inline assembly.
-      #
-      # If you update the patches in `patches/lowrisc-toolchain-gcc-rv32imcb`,
-      # you will need to revalidate that this behaviour works. A good testcase
-      # is a file with a `pcnt` instruction in inline assembly.
-      #
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-rv32imcb" \
-        "riscv32-unknown-elf" \
-        "/tools/riscv" \
-        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany" \
-        "-Wa,-march=rv32imczbb0p92_zbf0p92_zbs0p92_zbt0p92" \
-        "-mno-riscv-attribute"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+    - bash: |
+        ./build-clang-with-args.sh \
+          "lowrisc-toolchain-rv32imc" \
+          "riscv32-unknown-elf" \
+          "/tools/riscv" \
+          "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
+      displayName: "Build Clang toolchain"
+      env:
+        ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+        RELEASE_TAG: $(ReleaseTag)
 
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-rv32imcb" \
-        "riscv32-unknown-elf" \
-        "/tools/riscv" \
-        "-march=rv32imczbb0p92_zbf0p92_zbs0p92_zbt0p92" \
-        "-mabi=ilp32" "-mcmodel=medany" "-menable-experimental-extensions"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+    - template: "_upload-artifacts.yml"
+      parameters:
+        azure_name: rv32imc-toolchains
 
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: rv32imcb-toolchains
+  - job: "Toolchains_RV32IMCB"
+    displayName: "Toolchains targeting Ibex with 'Balanced' Bit-manipulation"
+    # These builds are using the 'Balanced' bit-manipulation subset identified in
+    # https://github.com/lowRISC/opentitan/issues/2708, and formatted for the
+    # correct versions as implemented by clang (B 0.92).
+    pool:
+      vmImage: "ubuntu-16.04"
+    container: holy-build-box
+    timeoutInMinutes: 360
+    steps:
+    - template: "_build-deps.yml"
 
-- job: "Toolchains_RV64IMAC"
-  displayName: "GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)"
-  pool:
-    vmImage: "ubuntu-16.04"
-  container: holy-build-box
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
+    - bash: |
+        # HACK: GCC does not allow you to compile with just a subset of the B
+        # extension using `-march=`, but it does assemble separately.
+        #
+        # So, we pass a more acceptable `-march=` to the assembler with `-Wa`.
+        #
+        # However, gcc will emit an assembly directive describing the arch it
+        # wanted when it compiled, which the assembler will use in spite of the
+        # `-march=` flag. So, we have to turn this off, using
+        # `-mno-riscv-attribute`.
+        #
+        # The end result is: The compiler will not introduce B extension
+        # instructions when compiling, but the assembler will understand them, so
+        # they can be used in inline assembly.
+        #
+        # If you update the patches in `patches/lowrisc-toolchain-gcc-rv32imcb`,
+        # you will need to revalidate that this behaviour works. A good testcase
+        # is a file with a `pcnt` instruction in inline assembly.
+        #
+        ./build-gcc-with-args.sh \
+          "lowrisc-toolchain-gcc-rv32imcb" \
+          "riscv32-unknown-elf" \
+          "/tools/riscv" \
+          "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany" \
+          "-Wa,-march=rv32imczbb0p92_zbf0p92_zbs0p92_zbt0p92" \
+          "-mno-riscv-attribute"
+      displayName: 'Build GCC toolchain'
+      env:
+        ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+        RELEASE_TAG: $(ReleaseTag)
 
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-rv64imac" \
-        "riscv64-unknown-elf" \
-        "/tools/riscv" \
-        "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+    - bash: |
+        ./build-clang-with-args.sh \
+          "lowrisc-toolchain-rv32imcb" \
+          "riscv32-unknown-elf" \
+          "/tools/riscv" \
+          "-march=rv32imczbb0p92_zbf0p92_zbs0p92_zbt0p92" \
+          "-mabi=ilp32" "-mcmodel=medany" "-menable-experimental-extensions"
+      displayName: "Build Clang toolchain"
+      env:
+        ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+        RELEASE_TAG: $(ReleaseTag)
 
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-rv64imac" \
-        "riscv64-unknown-elf" \
-        "/tools/riscv" \
-        "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+    - template: "_upload-artifacts.yml"
+      parameters:
+        azure_name: rv32imcb-toolchains
 
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: rv64imac-toolchains
+  - job: "Toolchains_RV64IMAC"
+    displayName: "GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)"
+    pool:
+      vmImage: "ubuntu-16.04"
+    container: holy-build-box
+    timeoutInMinutes: 360
+    steps:
+    - template: "_build-deps.yml"
 
-- job: "GCC_Multilib_Baremetal"
-  displayName: "RV64 GCC (Multilib Baremetal)"
-  condition: false
-  pool:
-    vmImage: "ubuntu-16.04"
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
+    - bash: |
+        ./build-gcc-with-args.sh \
+          "lowrisc-toolchain-gcc-rv64imac" \
+          "riscv64-unknown-elf" \
+          "/tools/riscv" \
+          "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
+      displayName: 'Build GCC toolchain'
+      env:
+        ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+        RELEASE_TAG: $(ReleaseTag)
 
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-baremetal" \
-        "riscv64-unknown-elf" \
-        "/opt/riscv-baremetal-toolchain"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
+    - bash: |
+        ./build-clang-with-args.sh \
+          "lowrisc-toolchain-rv64imac" \
+          "riscv64-unknown-elf" \
+          "/tools/riscv" \
+          "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
+      displayName: "Build Clang toolchain"
+      env:
+        ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
+        RELEASE_TAG: $(ReleaseTag)
 
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-baremetal" \
-        "riscv64-unknown-elf" \
-        "/opt/riscv-baremetal-toolchain"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: gcc-multilib-baremetal
-
-- job: "GCC_Multilib_Linux"
-  displayName: "RV64 GCC (Multilib Linux)"
-  condition: false
-  pool:
-    vmImage: "ubuntu-16.04"
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
-
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-linux" \
-        "riscv64-unknown-linux-gnu" \
-        "/opt/riscv-linux-toolchain"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-linux" \
-        "riscv64-unknown-linux-gnu" \
-        "/opt/riscv-linux-toolchain"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: gcc-multilib-linux
+    - template: "_upload-artifacts.yml"
+      parameters:
+        azure_name: rv64imac-toolchains
