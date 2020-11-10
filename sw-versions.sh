@@ -10,4 +10,5 @@ export CROSSTOOL_NG_VERSION=475d72ff55dbcd77f091ceb37cc9749cd1006c97
 export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 
 # master 2020-05-25
+export LLVM_URL=https://github.com/llvm/llvm-project.git
 export LLVM_VERSION=fa038e03504c7d0dfd438b1dfdd6da7081e75617
