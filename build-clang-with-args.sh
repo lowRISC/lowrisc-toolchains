@@ -50,7 +50,7 @@ cd "${build_top_dir}/build"
 
 
 llvm_dir="${build_top_dir}/build/llvm-project"
-git clone https://github.com/llvm/llvm-project.git "${llvm_dir}"
+git clone ${LLVM_URL} "${llvm_dir}"
 cd "${llvm_dir}"
 git checkout --force "${LLVM_VERSION}"
 
@@ -152,7 +152,7 @@ lowRISC toolchain version: ${tag_name}
 
 Clang version:
   ${clang_version_string}
-  (git: ${LLVM_VERSION})
+  (git: ${LLVM_URL} ${LLVM_VERSION})
 
 GCC version:
   ${gcc_version_string}
@@ -177,6 +177,7 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "kind": "combined",
   "version": "${tag_name}",
   "clang_version": "${clang_version_string}",
+  "clang_url": "${LLVM_URL}",
   "clang_git": "${LLVM_VERSION}",
   "gcc_version": "${gcc_version_string}",
   "qemu_version": "${qemu_version_string}",
