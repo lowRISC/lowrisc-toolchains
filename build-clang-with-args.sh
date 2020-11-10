@@ -24,6 +24,8 @@ if ! [ "$#" -ge 3 ]; then
   exit 2
 fi;
 
+source /hbb_exe/activate
+
 ## Take configuration from arguments
 # This is the name for the tar file.
 # Suggested to be the gcc config with s/gcc/clang/. Will be updated if it

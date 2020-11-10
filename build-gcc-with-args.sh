@@ -23,6 +23,8 @@ if ! [ "$#" -ge 3 ]; then
   exit 2
 fi;
 
+source /hbb_exe/activate
+
 ## Take configuration from arguments
 # This is the name for the tar file, and also the basename of the .config file
 toolchain_name="${1}"
@@ -52,6 +54,20 @@ mkdir -p "${toolchain_dest}"
 mkdir -p "${build_top_dir}/build/gcc"
 cd "${build_top_dir}/build/gcc"
 
+# Crosstool-ng hates these, and they might be set by hbb
+unset LD_LIBRARY_PATH
+unset LIBRARY_PATH
+unset LPATH
+unset CPATH
+unset C_INCLUDE_PATH
+unset CPLUS_INCLUDE_PATH
+unset OBJC_INCLUDE_PATH
+unset CFLAGS
+unset CXXFLAGS
+unset CC
+unset CXX
+unset GREP_OPTIONS
+
 # Create crosstool-ng config file with correct `CT_PREFIX_DIR` and `CT_LOCAL_PATCH_DIR`
 {
   cat "${build_top_dir}/${toolchain_name}.config" \
@@ -68,7 +84,10 @@ cat .config
 # Invoke crosstool-ng
 ct-ng build
 
-# Build Qemu when building a RISC-V linux toolchain
+# Re-source HBB, to get back unset env variables.
+source /hbb_exe/activate
+
+# Build Qemu
 qemu_dir="${build_top_dir}/build/qemu"
 
 qemu_prefix_arg=""

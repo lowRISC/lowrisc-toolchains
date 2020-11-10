@@ -1,22 +1,14 @@
-# This installs the build dependencies for:
-# - using crosstool-ng to install a toolchain
-# - building qemu
-#
+# This installs crosstool-ng and sets the `ReleaseTag` for future steps
 steps:
 - bash: |
-    sudo apt-get install -y build-essential autoconf bison flex \
-      texinfo help2man gawk libtool-bin libncurses5-dev git libtool \
-      gettext wget curl libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev \
-      lld-9 clang-9 cmake
-  displayName: 'Install build dependencies'
-
-- bash: |
     ./install-crosstool-ng.sh
-  displayName: 'Build and install crosstool-ng'
-
+  displayName: "Install crosstool-ng"
 - bash: |
     set -e
     set -x
+
+    source /hbb_exe/activate
+
     git fetch --tags
 
     # git-describe --always almost does what we want, but we need to connect the

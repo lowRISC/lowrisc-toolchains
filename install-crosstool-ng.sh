@@ -5,13 +5,23 @@
 
 build_top_dir="${PWD}"
 
+set -e
+
+source "/hbb/activate"
+
 # For *_VERSION variables
 # shellcheck source=sw-versions.sh
-. "${build_top_dir}/sw-versions.sh"
+source "${build_top_dir}/sw-versions.sh"
 
-mkdir -p build && cd build || exit 1
-git clone https://github.com/lowRISC/crosstool-ng || exit 1
-cd crosstool-ng || exit 1
-git checkout --force "${CROSSTOOL_NG_VERSION}" || exit 1
-./bootstrap || exit 1
-./configure --prefix=/usr/local && make && sudo make install
+mkdir -p "${build_top_dir}/build"
+
+git clone https://github.com/lowRISC/crosstool-ng "${build_top_dir}/build/crosstool-ng"
+cd "${build_top_dir}/build/crosstool-ng"
+
+git checkout --force "${CROSSTOOL_NG_VERSION}"
+
+./bootstrap
+./configure --prefix=/hbb && make && sudo make install
+
+cd "${build_top_dir}"
+rm -fr "${build_top_dir}/build"

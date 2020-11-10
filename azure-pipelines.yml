@@ -14,11 +14,18 @@ pr:
     include:
     - '*'
 
+resources:
+  containers:
+  - container: holy-build-box
+    image: 'ghcr.io/lenary/lowrisc-toolchains/builder:latest'
+    containerRegistry: 'lowrisc-docker-upload'
+
 jobs:
 - job: "Toolchains_RV32IMC"
   displayName: "Toolchains targeting Ibex"
   pool:
     vmImage: "ubuntu-16.04"
+  container: holy-build-box
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
@@ -56,6 +63,7 @@ jobs:
   # correct versions as implemented by clang (B 0.92).
   pool:
     vmImage: "ubuntu-16.04"
+  container: holy-build-box
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
@@ -106,11 +114,12 @@ jobs:
   - template: "_upload-artifacts.yml"
     parameters:
       azure_name: rv32imcb-toolchains
-      
+
 - job: "Toolchains_RV64IMAC"
   displayName: "GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)"
   pool:
     vmImage: "ubuntu-16.04"
+  container: holy-build-box
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
@@ -140,69 +149,3 @@ jobs:
   - template: "_upload-artifacts.yml"
     parameters:
       azure_name: rv64imac-toolchains
-
-- job: "GCC_Multilib_Baremetal"
-  displayName: "RV64 GCC (Multilib Baremetal)"
-  condition: false
-  pool:
-    vmImage: "ubuntu-16.04"
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
-
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-baremetal" \
-        "riscv64-unknown-elf" \
-        "/opt/riscv-baremetal-toolchain"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-baremetal" \
-        "riscv64-unknown-elf" \
-        "/opt/riscv-baremetal-toolchain"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: gcc-multilib-baremetal
-
-- job: "GCC_Multilib_Linux"
-  displayName: "RV64 GCC (Multilib Linux)"
-  condition: false
-  pool:
-    vmImage: "ubuntu-16.04"
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
-
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-linux" \
-        "riscv64-unknown-linux-gnu" \
-        "/opt/riscv-linux-toolchain"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-gcc-multilib-linux" \
-        "riscv64-unknown-linux-gnu" \
-        "/opt/riscv-linux-toolchain"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: gcc-multilib-linux
