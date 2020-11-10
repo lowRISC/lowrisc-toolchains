@@ -23,6 +23,8 @@ if ! [ "$#" -ge 3 ]; then
   exit 2
 fi;
 
+source /hbb_exe/activate
+
 ## Take configuration from arguments
 # This is the name for the tar file, and also the basename of the .config file
 toolchain_name="${1}"

@@ -3,20 +3,29 @@
 # - building qemu
 #
 steps:
+
+# Untranslated dependencies:
+# - libpixman-1-dev
+# - libglib2.0-dev
 - bash: |
-    sudo apt-get install -y build-essential autoconf bison flex \
-      texinfo help2man gawk libtool-bin libncurses5-dev git libtool \
-      gettext wget curl libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev \
-      lld-9 clang-9 cmake
+    su -- root -c 'yum install -y sudo'
+
+    source /hbb_exe/activate
+    sudo yum install -y bison flex texinfo help2man gawk ncurses-devel \
+      ncurses-static gettext wget curl libfdt-devel
   displayName: 'Install build dependencies'
 
 - bash: |
+    source /hbb_exe/activate
     ./install-crosstool-ng.sh
   displayName: 'Build and install crosstool-ng'
 
 - bash: |
     set -e
     set -x
+
+    source /hbb_exe/activate
+
     git fetch --tags
 
     # git-describe --always almost does what we want, but we need to connect the
