@@ -51,7 +51,7 @@ cd "${build_top_dir}/build"
 
 llvm_dir="${build_top_dir}/build/llvm-project"
 if [ ! -d "${llvm_dir}" ]; then
-  git clone https://github.com/llvm/llvm-project.git "${llvm_dir}"
+  git clone ${LLVM_URL} "${llvm_dir}"
 fi
 cd "${llvm_dir}"
 git fetch origin
@@ -155,7 +155,7 @@ lowRISC toolchain version: ${tag_name}
 
 Clang version:
   ${clang_version_string}
-  (git: ${LLVM_VERSION})
+  (git: ${LLVM_URL} ${LLVM_VERSION})
 
 GCC version:
   ${gcc_version_string}
@@ -176,6 +176,7 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "kind": "combined",
   "version": "${tag_name}",
   "clang_version": "${clang_version_string}",
+  "clang_url": "${LLVM_URL}",
   "clang_git": "${LLVM_VERSION}",
   "gcc_version": "${gcc_version_string}",
   "crosstool-ng_version": "${ct_ng_version_string}",
