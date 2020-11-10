@@ -69,7 +69,14 @@ cat .config
 ct-ng build
 
 # Build Qemu when building a RISC-V linux toolchain
-qemu_dir="${build_top_dir}/build/qemu"
+wget "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz"
+tar -xf "qemu-${QEMU_VERSION}.tar.xz" -C "${build_top_dir}/build"
+qemu_dir="${build_top_dir}/build/qemu-${QEMU_VERSION}"
+
+qemu_targets="riscv32-softmmu"
+qemu_targets+=",riscv64-softmmu"
+qemu_targets+=",riscv32-linux-user"
+qemu_targets+=",riscv64-linux-user"
 
 qemu_prefix_arg=""
 case "${toolchain_target}" in
@@ -78,19 +85,15 @@ case "${toolchain_target}" in
   ;;
 esac
 
-git clone https://git.qemu.org/git/qemu.git "${qemu_dir}"
-cd "${qemu_dir}"
-
-git checkout --force --recurse-submodules "${QEMU_VERSION}"
-
 mkdir -p "${qemu_dir}/build"
 cd "${qemu_dir}/build"
 
 # shellcheck disable=SC2086
 "${qemu_dir}/configure" \
   "--prefix=${toolchain_dest}" \
+  "--static" \
   ${qemu_prefix_arg} \
-  "--target-list=riscv64-softmmu,riscv32-softmmu,riscv64-linux-user,riscv32-linux-user"
+  "--target-list=${qemu_targets}"
 
 make -j$(( $(nproc) + 2 ))
 make -j$(( $(nproc) + 2 )) install
