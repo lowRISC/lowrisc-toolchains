@@ -87,38 +87,38 @@ ct-ng build
 # Re-source HBB, to get back unset env variables.
 source /hbb_exe/activate
 
-# Build Qemu
-qemu_dir="${build_top_dir}/build/qemu"
+# # Build Qemu
+# qemu_dir="${build_top_dir}/build/qemu"
 
-qemu_prefix_arg=""
-case "${toolchain_target}" in
-  riscv*-linux-gnu)
-    qemu_prefix_arg="--interp-prefix=${toolchain_dest}/${toolchain_target}/sysroot"
-  ;;
-esac
+# qemu_prefix_arg=""
+# case "${toolchain_target}" in
+#   riscv*-linux-gnu)
+#     qemu_prefix_arg="--interp-prefix=${toolchain_dest}/${toolchain_target}/sysroot"
+#   ;;
+# esac
 
-git clone https://git.qemu.org/git/qemu.git "${qemu_dir}"
-cd "${qemu_dir}"
+# git clone https://git.qemu.org/git/qemu.git "${qemu_dir}"
+# cd "${qemu_dir}"
 
-git checkout --force --recurse-submodules "${QEMU_VERSION}"
+# git checkout --force --recurse-submodules "${QEMU_VERSION}"
 
-mkdir -p "${qemu_dir}/build"
-cd "${qemu_dir}/build"
+# mkdir -p "${qemu_dir}/build"
+# cd "${qemu_dir}/build"
 
-# shellcheck disable=SC2086
-"${qemu_dir}/configure" \
-  "--prefix=${toolchain_dest}" \
-  ${qemu_prefix_arg} \
-  "--target-list=riscv64-softmmu,riscv32-softmmu,riscv64-linux-user,riscv32-linux-user"
+# # shellcheck disable=SC2086
+# "${qemu_dir}/configure" \
+#   "--prefix=${toolchain_dest}" \
+#   ${qemu_prefix_arg} \
+#   "--target-list=riscv64-softmmu,riscv32-softmmu,riscv64-linux-user,riscv32-linux-user"
 
-make -j$(( $(nproc) + 2 ))
-make -j$(( $(nproc) + 2 )) install
+# make -j$(( $(nproc) + 2 ))
+# make -j$(( $(nproc) + 2 )) install
 
-# Copy Qemu licenses into toolchain
-mkdir -p "${toolchain_dest}/share/licenses/qemu"
-cp "${qemu_dir}/LICENSE" "${toolchain_dest}/share/licenses/qemu"
-cp "${qemu_dir}/COPYING" "${toolchain_dest}/share/licenses/qemu"
-cp "${qemu_dir}/COPYING.LIB" "${toolchain_dest}/share/licenses/qemu"
+# # Copy Qemu licenses into toolchain
+# mkdir -p "${toolchain_dest}/share/licenses/qemu"
+# cp "${qemu_dir}/LICENSE" "${toolchain_dest}/share/licenses/qemu"
+# cp "${qemu_dir}/COPYING" "${toolchain_dest}/share/licenses/qemu"
+# cp "${qemu_dir}/COPYING.LIB" "${toolchain_dest}/share/licenses/qemu"
 
 cd "${build_top_dir}"
 
@@ -135,7 +135,7 @@ ls -l "${toolchain_dest}"
 set +o pipefail # head causes pipe failures, so we have to switch off pipefail while we use it.
 ct_ng_version_string="$(ct-ng version | head -n1)"
 gcc_version_string="$("${toolchain_dest}/bin/${toolchain_target}-gcc" --version | head -n1)"
-qemu_version_string="$("${toolchain_dest}/bin/qemu-riscv64" --version | head -n1)"
+# qemu_version_string="$("${toolchain_dest}/bin/qemu-riscv64" --version | head -n1)"
 build_date="$(date -u)"
 set -o pipefail
 
@@ -147,10 +147,6 @@ lowRISC toolchain version: ${tag_name}
 
 GCC version:
   ${gcc_version_string}
-
-Qemu version:
-  ${qemu_version_string}
-  (git: ${QEMU_VERSION})
 
 Crosstool-ng version:
   ${ct_ng_version_string}
@@ -168,8 +164,6 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "kind": "gcc-only",
   "version": "${tag_name}",
   "gcc_version": "${gcc_version_string}",
-  "qemu_version": "${qemu_version_string}",
-  "qemu_git": "${QEMU_VERSION}",
   "crosstool-ng_version": "${ct_ng_version_string}",
   "crosstool-ng_git": "${CROSSTOOL_NG_VERSION}",
   "build_date": "${build_date}",
