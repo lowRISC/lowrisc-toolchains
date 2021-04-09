@@ -1,13 +1,13 @@
-# This installs the build dependencies for:
-# - using crosstool-ng to install a toolchain
-# - building qemu
-#
+# Copyright lowRISC contributors.
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
 steps:
 - bash: |
-    sudo apt-get install -y build-essential autoconf bison flex \
-      texinfo help2man gawk libtool-bin libncurses5-dev git libtool \
-      gettext wget curl libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev \
-      lld-9 clang-9 cmake
+    ./prepare-centos6.sh
+    # Azure Pipelines starts bash with --noprofile --norc, preventing the
+    # loading of /etc/profile. Load the one profile script we care about through
+    # an environment variable instead.
+    echo "##vso[task.setvariable variable=BASH_ENV]/etc/profile.d/scl_enable.sh"
   displayName: 'Install build dependencies'
 
 - bash: |
@@ -17,6 +17,7 @@ steps:
 - bash: |
     set -e
     set -x
+
     git fetch --tags
 
     # git-describe --always almost does what we want, but we need to connect the

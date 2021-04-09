@@ -64,8 +64,26 @@ cd "${build_top_dir}/build/gcc"
 ct-ng upgradeconfig
 cat .config
 
-# Invoke crosstool-ng
-ct-ng build
+# crosstool-ng doesn't work with some environment variables set, leading to
+# errors like "Don't set LD_LIBRARY_PATH. It screws up the build." otherwise.
+# Do so in a subshell to avoid disturbing subsequent tasks.
+(
+  unset LD_LIBRARY_PATH
+  unset LIBRARY_PATH
+  unset LPATH
+  unset CPATH
+  unset C_INCLUDE_PATH
+  unset CPLUS_INCLUDE_PATH
+  unset OBJC_INCLUDE_PATH
+  unset CFLAGS
+  unset CXXFLAGS
+  unset CC
+  unset CXX
+  unset GREP_OPTIONS
+
+  # Invoke crosstool-ng
+  ct-ng build
+)
 
 cd "${build_top_dir}"
 
