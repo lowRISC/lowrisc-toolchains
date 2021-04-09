@@ -18,10 +18,16 @@ jobs:
 - job: "Toolchains_RV32IMC"
   displayName: "Toolchains targeting Ibex"
   pool:
-    vmImage: "ubuntu-16.04"
+    vmImage: "ubuntu-20.04"
+  container: lowrisc/lowrisc-base-centos6:latest
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
+
+  - bash: |
+      sudo mkdir -p /tools/riscv
+      sudo chmod 0777 /tools/riscv
+    displayName: "Prepare toolchain destination directory"
 
   - bash: |
       ./build-gcc-with-args.sh \
@@ -55,10 +61,16 @@ jobs:
   # https://github.com/lowRISC/opentitan/issues/2708, and formatted for the
   # correct versions as implemented by clang (B 0.92).
   pool:
-    vmImage: "ubuntu-16.04"
+    vmImage: "ubuntu-20.04"
+  container: lowrisc/lowrisc-base-centos6:latest
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
+
+  - bash: |
+      sudo mkdir -p /tools/riscv
+      sudo chmod 0777 /tools/riscv
+    displayName: "Prepare toolchain destination directory"
 
   - bash: |
       # HACK: GCC does not allow you to compile with just a subset of the B
@@ -106,14 +118,20 @@ jobs:
   - template: "_upload-artifacts.yml"
     parameters:
       azure_name: rv32imcb-toolchains
-      
+
 - job: "Toolchains_RV64IMAC"
   displayName: "GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)"
   pool:
-    vmImage: "ubuntu-16.04"
+    vmImage: "ubuntu-20.04"
+  container: lowrisc/lowrisc-base-centos6:latest
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
+
+  - bash: |
+      sudo mkdir -p /tools/riscv
+      sudo chmod 0777 /tools/riscv
+    displayName: "Prepare toolchain destination directory"
 
   - bash: |
       ./build-gcc-with-args.sh \
@@ -178,10 +196,16 @@ jobs:
   displayName: "RV64 GCC (Multilib Linux)"
   condition: false
   pool:
-    vmImage: "ubuntu-16.04"
+    vmImage: "ubuntu-20.04"
+  container: lowrisc/lowrisc-base-centos6:latest
   timeoutInMinutes: 360
   steps:
   - template: "_build-deps.yml"
+
+  - bash: |
+      sudo mkdir -p /tools/riscv
+      sudo chmod 0777 /tools/riscv
+    displayName: "Prepare toolchain destination directory"
 
   - bash: |
       ./build-gcc-with-args.sh \
