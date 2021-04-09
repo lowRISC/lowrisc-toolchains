@@ -95,13 +95,10 @@ llvm_distribution_components+="${llvm_tools}"
 
 cmake "${llvm_dir}/llvm" \
   -Wno-dev \
-  -DCMAKE_C_COMPILER="/usr/bin/clang-9" \
-  -DCMAKE_CXX_COMPILER="/usr/bin/clang++-9" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${toolchain_dest}" \
   -DLLVM_TARGETS_TO_BUILD="RISCV" \
   -DLLVM_ENABLE_PROJECTS="clang;lld;clang-tools-extra" \
-  -DLLVM_ENABLE_LLD=On \
   -DLLVM_ENABLE_BACKTRACES=Off \
   -DLLVM_DEFAULT_TARGET_TRIPLE="${toolchain_target}" \
   -DLLVM_STATIC_LINK_CXX_STDLIB=On \
