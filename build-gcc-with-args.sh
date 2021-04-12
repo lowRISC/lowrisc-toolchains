@@ -53,14 +53,13 @@ cd "${build_top_dir}/build/gcc"
 
 # Create crosstool-ng config file with correct `CT_PREFIX_DIR` and `CT_LOCAL_PATCH_DIR`
 {
-  cat "${build_top_dir}/${toolchain_name}.config" \
-    | grep -v '^CT_PREFIX_DIR=';
-  echo "";
+  grep -v '^CT_PREFIX_DIR=' "${build_top_dir}/${toolchain_name}.config"
+  echo ""
   echo "# ADDED BY ${0}";
-  echo "CT_PREFIX_DIR=\"${toolchain_dest}\"";
-  echo "CT_LOCAL_PATCH_DIR=\"${build_top_dir}/patches/${toolchain_name}\"";
-  echo "# END ADDED BY ${0}";
-} >> .config
+  echo "CT_PREFIX_DIR=\"${toolchain_dest}\""
+  echo "CT_LOCAL_PATCH_DIR=\"${build_top_dir}/patches/${toolchain_name}\""
+  echo "# END ADDED BY ${0}"
+} > .config
 ct-ng upgradeconfig
 cat .config
 
