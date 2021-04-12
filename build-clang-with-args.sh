@@ -50,8 +50,11 @@ cd "${build_top_dir}/build"
 
 
 llvm_dir="${build_top_dir}/build/llvm-project"
-git clone https://github.com/llvm/llvm-project.git "${llvm_dir}"
+if [ ! -d "${llvm_dir}" ]; then
+  git clone https://github.com/llvm/llvm-project.git "${llvm_dir}"
+fi
 cd "${llvm_dir}"
+git fetch origin
 git checkout --force "${LLVM_VERSION}"
 
 # Clang Symlinks
@@ -62,6 +65,10 @@ lld_links_to_create="ld.lld;ld64.lld"
 lld_links_to_create+=";${toolchain_target}-ld.lld;${toolchain_target}-ld64.lld"
 
 llvm_build_dir="${build_top_dir}/build/llvm-build"
+
+# Delete old build artifacts (if they exist)
+rm -rf "${llvm_build_dir}"
+
 mkdir -p "${llvm_build_dir}"
 cd "${llvm_build_dir}"
 
