@@ -6,12 +6,7 @@ steps:
 # This comes after uploading azure artifacts so we can debug the azure artifact
 # if this step fails.
 - bash: |
-    set -e
-    find "${ARTIFACT_STAGING_DIR}" \
-      -type f \
-      -name "*.tar.xz" \
-      -print0 \
-      | xargs -0 -n1 ./check-tarball.sh
+    for f in ${ARTIFACT_STAGING_DIR}/*.tar.xz; do ./check-tarball.sh "$f"; done
   env:
     ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
   displayName: "Checking Artifact Tarballs"
