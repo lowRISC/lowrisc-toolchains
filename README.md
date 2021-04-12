@@ -12,14 +12,13 @@ for pre-built toolchains.
 * A GCC RV32IMC without hardfloat support, targeting [Ibex](https://github.com/lowRISC/ibex/)
 * A GCC RV64IMAC, targeting [Muntjac](https://github.com/lowRISC/muntjac)
 * A GCC elf multilib toolchain
-* A GCC linux multilib toolchain, with linux user-space Qemu binaries
+* A GCC linux multilib toolchain
 
 How to do a release
 -------------------
 
 1. Modify any of the following variables to configure the build:
    - `CROSSTOOL_NG_VERSION` in `install-crosstool-ng.sh`
-   - `QEMU_VERSION` in `build-gcc-with-args.sh`
 
 2. Modify any of the `*.config` files to update the crosstool-ng configurations
    for a particular toolchain.
