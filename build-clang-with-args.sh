@@ -5,7 +5,7 @@
 
 ## build-clang-with-args.sh
 #
-# This requires a gcc/qemu toolchain dir made by `build-gcc-with-args.sh`
+# This requires a gcc toolchain dir made by `build-gcc-with-args.sh`
 #
 # Builds:
 # - Clang/LLVM
@@ -140,7 +140,6 @@ set +o pipefail # head causes pipe failures, so we have to switch off pipefail w
 ct_ng_version_string="$( (set +o pipefail; ct-ng version | head -n1) )"
 clang_version_string="$("${toolchain_dest}/bin/clang" --version | head -n1)"
 gcc_version_string="$("${toolchain_dest}/bin/${toolchain_target}-gcc" --version | head -n1)"
-qemu_version_string="$("${toolchain_dest}/bin/qemu-riscv64" --version | head -n1)"
 build_date="$(date -u)"
 set -o pipefail
 
@@ -156,10 +155,6 @@ Clang version:
 
 GCC version:
   ${gcc_version_string}
-
-Qemu version:
-  ${qemu_version_string}
-  (git: ${QEMU_VERSION})
 
 Crosstool-ng version:
   ${ct_ng_version_string}
@@ -179,8 +174,6 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "clang_version": "${clang_version_string}",
   "clang_git": "${LLVM_VERSION}",
   "gcc_version": "${gcc_version_string}",
-  "qemu_version": "${qemu_version_string}",
-  "qemu_git": "${QEMU_VERSION}",
   "crosstool-ng_version": "${ct_ng_version_string}",
   "crosstool-ng_git": "${CROSSTOOL_NG_VERSION}",
   "build_date": "${build_date}",
