@@ -12,7 +12,6 @@
 # was an issue we ran into.
 
 set -e
-set -x
 set -o pipefail
 
 if ! [ "$#" = 1 ]; then
@@ -53,8 +52,54 @@ if ! python -mjson.tool "${tarball_dest}/buildinfo.json"; then
   found_error=true
 fi
 
+# Check binaries to ensure that they are only linked to a very limited set of
+# libraries:
+#
+# # Linux dynamic linker and kernel interface
+# ld-linux.*
+# linux-gate.so
+# linux-vdso.so
+#
+# # glibc
+# libc.so
+# libm.so
+# libpthread.so
+# librt.so
+# libdl.so
+# libcrypt.so  (NOT libcrypto.so!)
+# libutil.so
+# libnsl.so
+# libresolv.so
+
+# # GCC runtime
+# libgcc_s.so
+#
+# See
+# https://github.com/phusion/holy-build-box/blob/master/ESSENTIAL-SYSTEM-LIBRARIES.md
+# for details.
+
+# Clang and GCC link against the following libraries, which must be present at
+# runtime:
+# - libz.so.1 (zlib)
+# - libncursesw.so.5 and libtinfo.so.5 (ncurses5)
+# - libstdc++.so.6
+export LIBCHECK_ALLOW='libstdc\+\+|libtinfo|libncursesw|libz'
+
+libcheck_output="$(mktemp)"
+
+echo "Checking ELF Binaries for Library Usage"
+find "${tarball_dest}/bin" \
+  -exec sh -c 'file "$1" | grep -qi ": elf"' _ {} \; \
+  -exec python3 libcheck.py {} \; | tee "${libcheck_output}"
+if grep "is linked to non-system libraries" "${libcheck_output}"; then
+  echo "ERROR: Toolchain Executable Linked to non-system library."
+  found_error=true
+fi
+
 if [ "${found_error}" = "true" ]; then
+  echo "FAIL! Problems found, see errors above."
   exit 1
 else
+  echo "PASS! No problems found."
   exit 0
 fi
