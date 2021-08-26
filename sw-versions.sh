@@ -11,4 +11,4 @@ export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 
 # master 2020-05-25
 export LLVM_URL=https://github.com/llvm/llvm-project.git
-export LLVM_VERSION=fa038e03504c7d0dfd438b1dfdd6da7081e75617
+export LLVM_VERSION=d7b669b3a30345cfcdb2fde2af6f48aa4b94845d
