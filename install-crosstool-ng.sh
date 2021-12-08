@@ -14,7 +14,7 @@ set -e
 mkdir -p "${build_top_dir}/build"
 
 rm -rf "${build_top_dir}/build/crosstool-ng"
-git clone https://github.com/lowRISC/crosstool-ng "${build_top_dir}/build/crosstool-ng"
+git clone "${CROSSTOOL_NG_URL}" "${build_top_dir}/build/crosstool-ng"
 cd "${build_top_dir}/build/crosstool-ng"
 git checkout --force "${CROSSTOOL_NG_VERSION}"
 
