@@ -63,6 +63,13 @@ cd "${build_top_dir}/build/gcc"
 ct-ng upgradeconfig
 cat .config
 
+# Workaround for expired Let's encrypt certificate. Download ISL first without
+# the SSL certificate checks. The tarball checksums should suffice.
+mkdir -p "${build_top_dir}/build/gcc/.build/tarballs"
+wget -nc --no-check-certificate \
+  -O "${build_top_dir}/build/gcc/.build/tarballs/isl-0.20.tar.xz" \
+  https://libisl.sourceforge.io/isl-0.20.tar.xz
+
 # crosstool-ng doesn't work with some environment variables set, leading to
 # errors like "Don't set LD_LIBRARY_PATH. It screws up the build." otherwise.
 # Do so in a subshell to avoid disturbing subsequent tasks.
