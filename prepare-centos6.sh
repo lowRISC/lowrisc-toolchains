@@ -29,10 +29,3 @@ sudo yum install -y \
   zlib-static \
   libffi-devel
 
-# Enable SCLs for all shell sessions.
-# See https://access.redhat.com/solutions/527703
-cat << EOF > /tmp/scl_enable.sh
-#!/bin/bash
-source scl_source enable rh-python35
-EOF
-sudo mv /tmp/scl_enable.sh /etc/profile.d/scl_enable.sh

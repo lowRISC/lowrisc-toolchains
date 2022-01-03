@@ -15,6 +15,8 @@
 # - Adds cross-compilation configuration files for certain build systems
 # - Creates a tar file of the whole install directory
 
+source scl_source enable rh-python35
+
 set -e
 set -x
 set -o pipefail
