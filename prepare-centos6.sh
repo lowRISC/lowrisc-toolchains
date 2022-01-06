@@ -18,7 +18,6 @@ sudo yum install -y \
   help2man \
   gawk \
   gettext \
-  wget \
   curl \
   xz \
   ncurses-devel \
