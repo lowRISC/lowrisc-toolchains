@@ -1,0 +1,25 @@
+diff --git a/gnulib/import/glob.c b/gnulib/import/glob.c
+index 1bfcafb..9947f24 100644
+--- a/gnulib/import/glob.c
++++ b/gnulib/import/glob.c
+@@ -21,7 +21,7 @@
+    optimizes away the pattern == NULL test below.  */
+ # define _GL_ARG_NONNULL(params)
+ 
+-# include <config.h>
++# include <libc-config.h>
+ 
+ #endif
+ 
+diff --git a/gnulib/import/libc-config.h b/gnulib/import/libc-config.h
+index e3571ee..44c3d0f 100644
+--- a/gnulib/import/libc-config.h
++++ b/gnulib/import/libc-config.h
+@@ -189,3 +189,7 @@
+ #define SHLIB_COMPAT(lib, introduced, obsoleted) 0
+ #define compat_symbol(lib, local, symbol, version) extern int dummy
+ #define versioned_symbol(lib, local, symbol, version) extern int dummy
++
++#ifndef __THROWNL
++#define __THROWNL __THROW
++#endif
