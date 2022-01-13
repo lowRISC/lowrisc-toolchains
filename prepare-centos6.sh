@@ -23,7 +23,7 @@ sudo yum install -y \
   ncurses-devel \
   ncurses-static \
   pixman-devel \
-  rh-python35 \
+  rh-python36 \
   zlib-devel \
   zlib-static \
   libffi-devel
@@ -32,6 +32,6 @@ sudo yum install -y \
 # See https://access.redhat.com/solutions/527703
 cat << EOF > /tmp/scl_enable.sh
 #!/bin/bash
-source scl_source enable rh-python35
+source scl_source enable rh-python36
 EOF
 sudo mv /tmp/scl_enable.sh /etc/profile.d/scl_enable.sh
