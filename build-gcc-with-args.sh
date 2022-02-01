@@ -29,8 +29,14 @@ toolchain_name="${1}"
 toolchain_target="${2}"
 # This is the directory where we want the toolchain to be installed.
 toolchain_dest="${3}"
+# -march option default value
+march="${4}"
+# -mabi option default value
+mabi="${5}"
+# -mcmodel option default value
+mcmodel="${6}"
 # Remaining cflags for build configurations
-toolchain_cflags=("${@:4}")
+toolchain_cflags=("${@:7}")
 
 build_top_dir="${PWD}"
 
@@ -91,7 +97,8 @@ cd "${build_top_dir}"
 "${build_top_dir}/generate-gcc-cmake-toolchain.sh" \
   "${toolchain_target}" "${toolchain_dest}" "${toolchain_cflags[@]}"
 "${build_top_dir}/generate-gcc-meson-cross-file.sh" \
-  "${toolchain_target}" "${toolchain_dest}" "${toolchain_cflags[@]}"
+  "${toolchain_target}" "${toolchain_dest}" ${march} ${mabi} ${mcmodel} \
+  "${toolchain_cflags[@]}"
 
 ls -l "${toolchain_dest}"
 
@@ -116,7 +123,7 @@ Crosstool-ng version:
   (git: ${CROSSTOOL_NG_URL} ${CROSSTOOL_NG_VERSION})
 
 C Flags:
-  ${toolchain_cflags[@]}
+  -march=${march} -mabi=${mabi} -mcmodel=${mcmodel} ${toolchain_cflags[@]}
 
 Built at ${build_date} on $(hostname)
 BUILDINFO
