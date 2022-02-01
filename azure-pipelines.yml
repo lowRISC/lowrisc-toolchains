@@ -34,7 +34,7 @@ jobs:
         "lowrisc-toolchain-gcc-rv32imc" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
+        "rv32imc" "ilp32" "medany"
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
@@ -45,7 +45,7 @@ jobs:
         "lowrisc-toolchain-rv32imc" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv32imc" "-mabi=ilp32" "-mcmodel=medany"
+        "rv32imc" "ilp32" "-medany"
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
@@ -77,8 +77,8 @@ jobs:
         "lowrisc-toolchain-gcc-rv32imcb" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv32imc_zba_zbb_zbc_zbs" \
-        "-mabi=ilp32" "-mcmodel=medany"
+        "rv32imc_zba_zbb_zbc_zbs" \
+        "ilp32" "medany"
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
@@ -89,8 +89,8 @@ jobs:
         "lowrisc-toolchain-rv32imcb" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv32imc_zba0p93_zbb0p93_zbc0p93_zbs0p93" \
-        "-mabi=ilp32" "-mcmodel=medany" "-menable-experimental-extensions"
+        "rv32imc_zba0p93_zbb0p93_zbc0p93_zbs0p93" \
+        "ilp32" "medany" "-menable-experimental-extensions"
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
@@ -119,7 +119,7 @@ jobs:
         "lowrisc-toolchain-gcc-rv64imac" \
         "riscv64-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
+        "rv64imac" "lp64" "medany"
     displayName: 'Build GCC toolchain'
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
@@ -130,7 +130,7 @@ jobs:
         "lowrisc-toolchain-rv64imac" \
         "riscv64-unknown-elf" \
         "/tools/riscv" \
-        "-march=rv64imac" "-mabi=lp64" "-mcmodel=medany"
+        "rv64imac" "lp64" "medany"
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
