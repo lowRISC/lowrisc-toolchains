@@ -15,48 +15,8 @@ pr:
     - '*'
 
 jobs:
-- job: "Toolchains_RV32IMC"
-  displayName: "Toolchains targeting Ibex"
-  pool:
-    vmImage: "ubuntu-20.04"
-  container: lowrisc/lowrisc-base-centos6:latest
-  timeoutInMinutes: 360
-  steps:
-  - template: "_build-deps.yml"
-
-  - bash: |
-      sudo mkdir -p /tools/riscv
-      sudo chmod 0777 /tools/riscv
-    displayName: "Prepare toolchain destination directory"
-
-  - bash: |
-      ./build-gcc-with-args.sh \
-        "lowrisc-toolchain-gcc-rv32imc" \
-        "riscv32-unknown-elf" \
-        "/tools/riscv" \
-        "rv32imc" "ilp32" "medany"
-    displayName: 'Build GCC toolchain'
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - bash: |
-      ./build-clang-with-args.sh \
-        "lowrisc-toolchain-rv32imc" \
-        "riscv32-unknown-elf" \
-        "/tools/riscv" \
-        "rv32imc" "ilp32" "medany"
-    displayName: "Build Clang toolchain"
-    env:
-      ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
-      RELEASE_TAG: $(ReleaseTag)
-
-  - template: "_upload-artifacts.yml"
-    parameters:
-      azure_name: rv32imc-toolchains
-
 - job: "Toolchains_RV32IMCB"
-  displayName: "Toolchains targeting Ibex with 'Balanced' Bit-manipulation"
+  displayName: "Toolchains targeting Ibex with bit-manipulation extensions"
   # These builds are using the ratified bitmanip extensions, version 1.0: Zba,
   # Zbb, Zbc, and Zbs. For the current version of Clang we need to specify them
   # as version 0.93, but they should be equivalent.

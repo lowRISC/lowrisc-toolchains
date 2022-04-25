@@ -48,12 +48,6 @@ build_top_dir="${PWD}"
 # shellcheck source=sw-versions.sh
 source "${build_top_dir}/sw-versions.sh"
 
-if [[ "${toolchain_name}" == *-rv32imcb ]]; then
-  llvm_version="${LLVM_BITMANIP_VERSION}"
-else
-  llvm_version="${LLVM_VERSION}"
-fi
-
 tag_name="${RELEASE_TAG:-HEAD}"
 toolchain_full_name="${toolchain_name}-${tag_name}"
 
@@ -67,7 +61,7 @@ if [ ! -d "${llvm_dir}" ]; then
 fi
 cd "${llvm_dir}"
 git fetch origin
-git checkout --force "${llvm_version}"
+git checkout --force "${LLVM_VERSION}"
 
 # Clang Symlinks
 clang_links_to_create="clang++"
@@ -168,7 +162,7 @@ lowRISC toolchain version: ${tag_name}
 
 Clang version:
   ${clang_version_string}
-  (git: ${LLVM_URL} ${llvm_version})
+  (git: ${LLVM_URL} ${LLVM_VERSION})
 
 GCC version:
   ${gcc_version_string}
@@ -190,7 +184,7 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "version": "${tag_name}",
   "clang_version": "${clang_version_string}",
   "clang_url": "${LLVM_URL}",
-  "clang_git": "${llvm_version}",
+  "clang_git": "${LLVM_VERSION}",
   "gcc_version": "${gcc_version_string}",
   "crosstool-ng_version": "${ct_ng_version_string}",
   "crosstool-ng_url": "${CROSSTOOL_NG_URL}",
