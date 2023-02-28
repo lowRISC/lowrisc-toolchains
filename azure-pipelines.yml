@@ -49,8 +49,8 @@ jobs:
         "lowrisc-toolchain-rv32imcb" \
         "riscv32-unknown-elf" \
         "/tools/riscv" \
-        "rv32imc_zba0p93_zbb0p93_zbc0p93_zbs0p93" \
-        "ilp32" "medany" "-menable-experimental-extensions"
+        "rv32imc_zba_zbb_zbc_zbs" \
+        "ilp32" "medany" ""
     displayName: "Build Clang toolchain"
     env:
       ARTIFACT_STAGING_DIR: $(Build.ArtifactStagingDirectory)
