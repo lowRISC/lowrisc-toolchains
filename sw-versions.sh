@@ -15,4 +15,4 @@ export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 # - `.option arch` assembly directive
 export LLVM_URL=https://github.com/lowRISC/llvm-project.git
 export LLVM_BRANCH=ot-llvm-16-hardening
-export LLVM_VERSION=f42b43e5262eae10a0c7d208423b4947e539f8f9
+export LLVM_VERSION=aad6208f3a55666d1bd391a3545f54c53e1d42aa
