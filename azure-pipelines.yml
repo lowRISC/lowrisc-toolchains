@@ -18,8 +18,7 @@ jobs:
 - job: "Toolchains_RV32IMCB"
   displayName: "Toolchains targeting Ibex with bit-manipulation extensions"
   # These builds are using the ratified bitmanip extensions, version 1.0: Zba,
-  # Zbb, Zbc, and Zbs. For the current version of Clang we need to specify them
-  # as version 0.93, but they should be equivalent.
+  # Zbb, Zbc, and Zbs.
   pool:
     vmImage: "ubuntu-20.04"
   container: lowrisc/lowrisc-base-centos6:latest
