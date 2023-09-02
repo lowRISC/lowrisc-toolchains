@@ -2,9 +2,9 @@
 
 # This documents the versions of any software checked out from git
 
-# master 2021-12-08
+# crosstool-ng-1.26.0-rc1
 export CROSSTOOL_NG_URL=https://github.com/crosstool-ng/crosstool-ng.git
-export CROSSTOOL_NG_VERSION=5075e1f98e4329502682746cc30fa5c0c5a19d26
+export CROSSTOOL_NG_VERSION=5a09578b6798f426b62d97b2ece1ba5e7b82990b
 
 # v4.0.1
 export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
