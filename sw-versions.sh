@@ -13,6 +13,7 @@ export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 # - hardening patches
 # - unratified bitmanip extensions
 # - `.option arch` assembly directive
+# - ePIC support
 export LLVM_URL=https://github.com/lowRISC/llvm-project.git
 export LLVM_BRANCH=ot-llvm-16-hardening
-export LLVM_VERSION=2e46e90331297be7788c355a0e1eb6b6b8e823c1
+export LLVM_VERSION=45dd59306f6c9b2894d0f697783844a0e1f2a69a
