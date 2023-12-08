@@ -1,0 +1,113 @@
+name: Build toolchains
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - master
+
+env:
+  ARTIFACT_STAGING_DIR: artifact
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - name: rv32imcb
+            display_name: Toolchains targeting Ibex with bit-manipulation extensions
+            target: riscv32-unknown-elf
+            output_dir: /tools/riscv
+            march: rv32imc_zba_zbb_zbc_zbs
+            mabi: ilp32
+            mcmodel: medany
+          - name: rv64imac
+            display_name: GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)
+            target: riscv64-unknown-elf
+            output_dir: /tools/riscv
+            march: rv64imac
+            mabi: lp64
+            mcmodel: medany
+#         - name: multilib-baremetal
+#           display_name: RV64 GCC (Multilib Baremetal)
+#           target: riscv64-unknown-elf
+#           output_dir: /opt/riscv-baremetal-toolchain
+#         - name: multilib-linux
+#           display_name: RV64 GCC (Multilib Linux)
+#           target: riscv64-unknown-linux-gnu
+#           output_dir: /opt/riscv-linux-toolchain
+
+    name: ${{ matrix.display_name }}
+    runs-on: ubuntu-20.04
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: |
+          echo ::group::Install dependencies
+          ./prepare-ubuntu-20.04.sh
+          ./install-crosstool-ng.sh
+          echo ::endgroup::
+
+          echo Preparing toolchain destination directory...
+          sudo mkdir -p /tools/riscv
+          sudo chmod 0777 /tools/riscv
+
+          echo ::group::Set the release tag env var
+          echo "RELEASE_TAG=$(./release_tag.sh)" >> "$GITHUB_ENV"
+          echo ::endgroup::
+
+          echo Creating artifact staging directory...
+          mkdir "$ARTIFACT_STAGING_DIR"
+
+      - name: Build GCC toolchain
+        run: |
+          ./build-gcc-with-args.sh \
+            "lowrisc-toolchain-gcc-${{ matrix.name }}" \
+            "${{ matrix.target }}" \
+            "${{ matrix.output_dir }}" \
+            "${{ matrix.march }}" \
+            "${{ matrix.mabi}}" \
+            "${{ matrix.mcmodel }}" \
+            "${{ matrix.cflags }}"
+
+      - name: Build Clang toolchain
+        run: |
+          ./build-clang-with-args.sh \
+            "lowrisc-toolchain-${{ matrix.name }}" \
+            "${{ matrix.target }}" \
+            "${{ matrix.output_dir }}" \
+            "${{ matrix.march }}" \
+            "${{ matrix.mabi}}" \
+            "${{ matrix.mcmodel }}" \
+            "${{ matrix.cflags }}"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.name }}-toolchains
+          path: ${{ env.ARTIFACT_STAGING_DIR }}
+
+      - name: Check tarballs
+        run: |
+          set -e
+          for f in "${ARTIFACT_STAGING_DIR}"/*.tar.xz; do
+            ./check-tarball.sh "$f"
+          done
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Create the release if it doesn't already exist.
+          gh release create "$RELEASE_TAG" --prerelease || echo "release exists"
+          # Upload this job's artifacts.
+          gh release upload "$RELEASE_TAG" --clobber \
+            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-${{ matrix.name }}-${RELEASE_TAG}.tar.xz" \
+            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-gcc-${{ matrix.name }}-${RELEASE_TAG}.tar.xz"
