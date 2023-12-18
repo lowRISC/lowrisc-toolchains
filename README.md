@@ -23,14 +23,13 @@ How to do a release
 2. Modify any of the `*.config` files to update the crosstool-ng configurations
    for a particular toolchain.
 
-3. Push the changes or do a pull request, and wait for the pipeline to
+3. Push the changes or do a pull request, and wait for the CI workflow to
    complete.
 
-   The build can be tested by downloading the Azure Pipeline artifacts.
-     1. Go to the [lowrisc-toolchains Azure Pipelines page](https://dev.azure.com/lowrisc/lowrisc-toolchains/_build?definitionId=2&_a=summary)
-     2. Select a build
-     3. Click on "Artifacts" (top right)
-     4. Download the desired artifact, and test it.
+   The build can be tested by downloading the GitHub artifacts.
+     1. Go to the [lowrisc-toolchains Actions page](https://github.com/lowRISC/lowrisc-toolchains/actions).
+     2. Select a workflow run from the list.
+     4. Download the desired artifact from the bottom of the page and test it.
 
 4. Tag a release
 
@@ -45,7 +44,7 @@ How to do a release
    git push origin $VERSION
    ```
 
-   Now the release builds on Azure Pipelines, and the resulting binaries
+   Now the release builds on GitHub's CI, and the resulting binaries
    will be uploaded to
    [GitHub releases](https://github.com/lowRISC/lowrisc-toolchains/releases).
 
