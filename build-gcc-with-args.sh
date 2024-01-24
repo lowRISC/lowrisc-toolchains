@@ -64,6 +64,8 @@ cd "${build_top_dir}/build/gcc"
   echo "# ADDED BY ${0}";
   echo "CT_PREFIX_DIR=\"${toolchain_dest}\""
   echo "CT_LOCAL_PATCH_DIR=\"${build_top_dir}/patches/${toolchain_name}\""
+  echo "CT_ALLOW_BUILD_AS_ROOT=y"
+  echo "CT_ALLOW_BUILD_AS_ROOT_SURE=y"
   echo "# END ADDED BY ${0}"
 } > .config
 ct-ng upgradeconfig
