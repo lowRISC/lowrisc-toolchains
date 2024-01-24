@@ -42,16 +42,40 @@ jobs:
 #           output_dir: /opt/riscv-linux-toolchain
 
     name: ${{ matrix.display_name }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    # This is a CentOS 7 based image
+    container: quay.io/pypa/manylinux2014_x86_64
     timeout-minutes: 360
 
     steps:
-      - uses: actions/checkout@v4
+      # This uses checkout v3 instead of v4 because GitHub actions's nodejs 20 currently does not work on CentOS 7.
+      - uses: actions/checkout@v3
 
       - name: Setup environment
         run: |
           echo ::group::Install dependencies
-          ./prepare-ubuntu-20.04.sh
+          yum install -y \
+            sudo \
+            git \
+            shadow-utils \
+            bison \
+            flex \
+            texinfo \
+            help2man \
+            gawk \
+            gettext \
+            curl \
+            xz \
+            ncurses-devel \
+            ncurses-static \
+            pixman-devel \
+            rh-python36 \
+            zlib-devel \
+            zlib-static \
+            libffi-devel
+          echo ::endgroup::
+
+          echo ::group::Install crosstool-ng
           ./install-crosstool-ng.sh
           echo ::endgroup::
 
