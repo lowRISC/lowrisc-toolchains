@@ -54,25 +54,7 @@ jobs:
       - name: Setup environment
         run: |
           echo ::group::Install dependencies
-          yum install -y \
-            sudo \
-            git \
-            shadow-utils \
-            bison \
-            flex \
-            texinfo \
-            help2man \
-            gawk \
-            gettext \
-            curl \
-            xz \
-            ncurses-devel \
-            ncurses-static \
-            pixman-devel \
-            rh-python36 \
-            zlib-devel \
-            zlib-static \
-            libffi-devel
+          ./prepare-centos-7.sh
           echo ::endgroup::
 
           echo ::group::Install crosstool-ng
