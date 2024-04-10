@@ -59,3 +59,11 @@ gh pr checkout 267
 # 7c9dd840 (riscv-binutils-2.35-rvb) is our baseline
 git diff 7c9dd840 > $TOP/patches/lowrisc-toolchain-gcc-rv32imcb/binutils/git-7c9dd840/001-bitmanip.patch
 ```
+How to install pre-built toolchain
+------------------------------------
+1. Download a tar.gz file from release page.
+2. Decompress files to ~/.local
+```
+  tar -xf  <location of your tar.gz> --strip-components=1 -C ~/.local
+```
+3. Now you should be able to compile software with lowrisc-toolchain.
