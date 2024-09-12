@@ -7,9 +7,9 @@ set -e
 set -x
 
 # Repository for the `gh` GitHub CLI tool used for creating releases.
-yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
 
-yum install -y \
+dnf install -y \
   sudo \
   gh \
   git \
@@ -23,9 +23,8 @@ yum install -y \
   curl \
   xz \
   ncurses-devel \
-  ncurses-static \
   pixman-devel \
-  rh-python36 \
+  python36 \
   zlib-devel \
   zlib-static \
   libffi-devel

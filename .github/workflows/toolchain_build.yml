@@ -43,8 +43,8 @@ jobs:
 
     name: ${{ matrix.display_name }}
     runs-on: ubuntu-latest
-    # This is a CentOS 7 based image
-    container: quay.io/pypa/manylinux2014_x86_64
+    # This is an AlmaLinux 8 based image
+    container: quay.io/pypa/manylinux_2_28_x86_64
     timeout-minutes: 360
 
     steps:
@@ -54,7 +54,7 @@ jobs:
       - name: Setup environment
         run: |
           echo ::group::Install dependencies
-          ./prepare-centos-7.sh
+          ./prepare-host.sh
           echo ::endgroup::
 
           echo ::group::Install crosstool-ng
