@@ -47,7 +47,7 @@ if [ -s "${broken_symlinks}" ]; then
 fi
 
 echo "Checking buidinfo.json"
-if ! python -mjson.tool "${tarball_dest}/buildinfo.json"; then
+if ! python3 -mjson.tool "${tarball_dest}/buildinfo.json"; then
   echo "ERROR: buildinfo.json not valid json"
   found_error=true
 fi
