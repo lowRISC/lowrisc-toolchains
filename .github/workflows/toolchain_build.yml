@@ -48,8 +48,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      # This uses checkout v3 instead of v4 because GitHub actions's nodejs 20 currently does not work on CentOS 7.
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup environment
         run: |
@@ -94,7 +93,7 @@ jobs:
             "${{ matrix.mcmodel }}" \
             "${{ matrix.cflags }}"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-toolchains
           path: ${{ env.ARTIFACT_STAGING_DIR }}
