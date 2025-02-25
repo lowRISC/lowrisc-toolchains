@@ -17,7 +17,13 @@ jobs:
   build:
     strategy:
       matrix:
+        name: [rv32imcb, rv64imac]
+        os: [ubuntu-latest, ubuntu-24.04-arm]
         include:
+          - os: ubuntu-latest
+            host_arch: x86_64
+          - os: ubuntu-24.04-arm
+            host_arch: aarch64
           - name: rv32imcb
             display_name: Toolchains targeting Ibex with bit-manipulation extensions
             target: riscv32-unknown-elf
@@ -41,10 +47,10 @@ jobs:
 #           target: riscv64-unknown-linux-gnu
 #           output_dir: /opt/riscv-linux-toolchain
 
-    name: ${{ matrix.display_name }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.host_arch }} build of ${{ matrix.display_name }}
+    runs-on: ${{ matrix.os }}
     # This is an AlmaLinux 8 based image
-    container: quay.io/pypa/manylinux_2_28_x86_64
+    container: quay.io/pypa/manylinux_2_28_${{ matrix.host_arch }}
     timeout-minutes: 360
 
     steps:
@@ -63,6 +69,10 @@ jobs:
           echo Preparing toolchain destination directory...
           sudo mkdir -p /tools/riscv
           sudo chmod 0777 /tools/riscv
+
+          echo ::group::Set the host architecture env var
+          echo "HOST_ARCH=${{ matrix.host_arch }}" >> "$GITHUB_ENV"
+          echo ::endgroup::
 
           echo ::group::Set the release tag env var
           echo "RELEASE_TAG=$(./release_tag.sh)" >> "$GITHUB_ENV"
@@ -95,7 +105,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}-toolchains
+          name: ${{ matrix.name }}-${{ matrix.host_arch }}-toolchains
           path: ${{ env.ARTIFACT_STAGING_DIR }}
 
       - name: Check tarballs
@@ -117,5 +127,5 @@ jobs:
           gh release create "$RELEASE_TAG" --prerelease || echo "release exists"
           # Upload this job's artifacts.
           gh release upload "$RELEASE_TAG" --clobber \
-            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-${{ matrix.name }}-${RELEASE_TAG}.tar.xz" \
-            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-gcc-${{ matrix.name }}-${RELEASE_TAG}.tar.xz"
+            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-${{ matrix.name }}-${HOST_ARCH}-${RELEASE_TAG}.tar.xz" \
+            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-gcc-${{ matrix.name }}-${HOST_ARCH}-${RELEASE_TAG}.tar.xz"
