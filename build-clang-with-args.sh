@@ -49,7 +49,8 @@ build_top_dir="${PWD}"
 source "${build_top_dir}/sw-versions.sh"
 
 tag_name="${RELEASE_TAG:-HEAD}"
-toolchain_full_name="${toolchain_name}-${tag_name}"
+host_arch="${HOST_ARCH:-x86_64}"
+toolchain_full_name="${toolchain_name}-${host_arch}-${tag_name}"
 
 mkdir -p "${build_top_dir}/build"
 cd "${build_top_dir}/build"
