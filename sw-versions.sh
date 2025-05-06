@@ -13,6 +13,7 @@ export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 # - hardening patches
 # - unratified bitmanip extensions
 # - `.option arch` assembly directive
+# - single-byte code coverage
 export LLVM_URL=https://github.com/lowRISC/llvm-project.git
 export LLVM_BRANCH=ot-llvm-16-hardening
-export LLVM_VERSION=d213f6b2e0bcc561930538ef47b3b5cc900b5b17
+export LLVM_VERSION=50254b2020b89264c88e635745a3808a1cdf9641
