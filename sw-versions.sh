@@ -9,11 +9,6 @@ export CROSSTOOL_NG_VERSION=5a09578b6798f426b62d97b2ece1ba5e7b82990b
 # v4.0.1
 export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 
-# LLVM 16.0.2 plus:
-# - hardening patches
-# - unratified bitmanip extensions
-# - `.option arch` assembly directive
-# - single-byte code coverage
-export LLVM_URL=https://github.com/lowRISC/llvm-project.git
-export LLVM_BRANCH=ot-llvm-16-hardening
-export LLVM_VERSION=50254b2020b89264c88e635745a3808a1cdf9641
+export LLVM_URL=https://github.com/llvm/llvm-project.git
+export LLVM_BRANCH=main
+export LLVM_VERSION=4f18f3f09a744ddd05de2188592fa11533ff3054 # LLVM 20
