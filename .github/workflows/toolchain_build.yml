@@ -28,7 +28,7 @@ jobs:
             display_name: Toolchains targeting Ibex with bit-manipulation extensions
             target: riscv32-unknown-elf
             output_dir: /tools/riscv
-            march: rv32imc_zba_zbb_zbc_zbs
+            march: rv32imcb_zbc_zbp0p93_zbe0p93_zbf0p93_zbm0p93_zbr0p93_zbt0p93
             mabi: ilp32
             mcmodel: medany
           - name: rv64imac
