@@ -16,4 +16,4 @@ export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
 # - single-byte code coverage
 export LLVM_URL=https://github.com/lowRISC/llvm-project.git
 export LLVM_BRANCH=ot-llvm-16-hardening
-export LLVM_VERSION=93c7cfd52d78dcbfeab7e596aa3f698298fd97a2
+export LLVM_VERSION=dec908d48facb6041c12b95b8ade64719a894917
