@@ -38,14 +38,6 @@ jobs:
             march: rv64imac
             mabi: lp64
             mcmodel: medany
-#         - name: multilib-baremetal
-#           display_name: RV64 GCC (Multilib Baremetal)
-#           target: riscv64-unknown-elf
-#           output_dir: /opt/riscv-baremetal-toolchain
-#         - name: multilib-linux
-#           display_name: RV64 GCC (Multilib Linux)
-#           target: riscv64-unknown-linux-gnu
-#           output_dir: /opt/riscv-linux-toolchain
 
     name: ${{ matrix.host_arch }} build of ${{ matrix.display_name }}
     runs-on: ${{ matrix.os }}
