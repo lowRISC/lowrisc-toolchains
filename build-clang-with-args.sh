@@ -138,9 +138,6 @@ cd "${build_top_dir}"
 # These don't yet add cflags ldflags
 "${build_top_dir}/generate-clang-cmake-toolchain.sh" \
   "${toolchain_target}" "${toolchain_dest}" "${toolchain_cflags[@]}"
-"${build_top_dir}/generate-clang-meson-cross-file.sh" \
-  "${toolchain_target}" "${toolchain_dest}" ${march} ${mabi} ${mcmodel} \
-  "${toolchain_cflags[@]}"
 
 # Copy LLVM licenses into toolchain
 mkdir -p "${toolchain_dest}/share/licenses/llvm"
