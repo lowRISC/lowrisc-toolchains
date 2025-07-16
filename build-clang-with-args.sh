@@ -134,14 +134,6 @@ cmake --build "${llvm_build_dir}" \
 
 cd "${build_top_dir}"
 
-## Create Toolchain Files!
-# These don't yet add cflags ldflags
-"${build_top_dir}/generate-clang-cmake-toolchain.sh" \
-  "${toolchain_target}" "${toolchain_dest}" "${toolchain_cflags[@]}"
-"${build_top_dir}/generate-clang-meson-cross-file.sh" \
-  "${toolchain_target}" "${toolchain_dest}" ${march} ${mabi} ${mcmodel} \
-  "${toolchain_cflags[@]}"
-
 # Copy LLVM licenses into toolchain
 mkdir -p "${toolchain_dest}/share/licenses/llvm"
 cp "${llvm_dir}/llvm/LICENSE.TXT" "${toolchain_dest}/share/licenses/llvm"
