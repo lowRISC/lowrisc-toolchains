@@ -69,6 +69,9 @@ jobs:
           echo Creating artifact staging directory...
           mkdir "$ARTIFACT_STAGING_DIR"
 
+          # Git warns about this repo having dubious ownership - ignore.
+          git config --global --add safe.directory "$(pwd)"
+
       - name: Build Binutils
         run: |
           ./build-binutils.sh \
@@ -110,9 +113,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Git warns about this repo having dubious ownership - ignore.
-          git config --global --add safe.directory /__w/lowrisc-toolchains/lowrisc-toolchains
-
           # Create the release if it doesn't already exist.
           gh release create "$RELEASE_TAG" --prerelease || echo "release exists"
           # Upload this job's artifacts.
