@@ -73,6 +73,12 @@ jobs:
           echo Creating artifact staging directory...
           mkdir "$ARTIFACT_STAGING_DIR"
 
+      - name: Build Binutils
+        run: |
+          ./build-binutils.sh \
+            "${{ matrix.target }}" \
+            "${{ matrix.output_dir }}"
+
       - name: Build GCC toolchain
         run: |
           ./build-gcc-with-args.sh \
