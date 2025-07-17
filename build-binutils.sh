@@ -56,7 +56,7 @@ git apply "${patch_dir}/binutils/"*
 mkdir -p build
 cd build
 
-export LDFLAGS="--static"
+# export LDFLAGS="--static"
 
 ../configure \
   --target "$target" \
