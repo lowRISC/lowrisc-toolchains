@@ -29,7 +29,7 @@ import os, sys, subprocess, re
 
 SYSTEM_LIBRARIES_REGEX = \
 	"linux-gate|linux-vdso|libpthread|librt|libdl|libcrypt|libm|libc" + \
-	"|ld-linux.*|libutil|libnsl|libgcc_s|libresolv"
+	"|ld-linux.*|libutil|libnsl|libresolv"
 
 if len(sys.argv) <= 1:
 	print("Usage: libcheck <FILES>")

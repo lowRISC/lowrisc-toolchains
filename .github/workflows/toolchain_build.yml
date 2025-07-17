@@ -25,14 +25,14 @@ jobs:
           - os: ubuntu-24.04-arm
             host_arch: aarch64
           - name: rv32imcb
-            display_name: Toolchains targeting Ibex with bit-manipulation extensions
+            display_name: RV32IMCB toolchains (Ibex)
             target: riscv32-unknown-elf
             output_dir: /tools/riscv
             march: rv32imc_zba_zbb_zbc_zbs
             mabi: ilp32
             mcmodel: medany
           - name: rv64imac
-            display_name: GCC and Clang/LLVM toolchains targeting RV64IMAC (Muntjac)
+            display_name: RV64IMAC toolchains (Muntjac)
             target: riscv64-unknown-elf
             output_dir: /tools/riscv
             march: rv64imac
@@ -78,17 +78,6 @@ jobs:
           ./build-binutils.sh \
             "${{ matrix.target }}" \
             "${{ matrix.output_dir }}"
-
-      - name: Build GCC toolchain
-        run: |
-          ./build-gcc-with-args.sh \
-            "lowrisc-toolchain-gcc-${{ matrix.name }}" \
-            "${{ matrix.target }}" \
-            "${{ matrix.output_dir }}" \
-            "${{ matrix.march }}" \
-            "${{ matrix.mabi}}" \
-            "${{ matrix.mcmodel }}" \
-            "${{ matrix.cflags }}"
 
       - name: Build Clang toolchain
         run: |
