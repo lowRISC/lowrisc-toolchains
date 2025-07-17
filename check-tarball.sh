@@ -78,7 +78,7 @@ fi
 # https://github.com/phusion/holy-build-box/blob/master/ESSENTIAL-SYSTEM-LIBRARIES.md
 # for details.
 
-# Clang and GCC link against the following libraries, which must be present at
+# Clang links against the following libraries, which must be present at
 # runtime:
 # - libz.so.1 (zlib)
 # - libncursesw.so.5 and libtinfo.so.5 (ncurses5)

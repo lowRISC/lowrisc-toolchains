@@ -9,8 +9,8 @@ Head over to the
 [GitHub releases for this repository](https://github.com/lowRISC/lowrisc-toolchains/releases)
 for pre-built toolchains.
 
-* A GCC RV32IMC without hardfloat support, targeting [Ibex](https://github.com/lowRISC/ibex/)
-* A GCC RV64IMAC, targeting [Muntjac](https://github.com/lowRISC/muntjac)
+* Clang RV32IMCB without hardfloat support, targeting [Ibex](https://github.com/lowRISC/ibex/)
+* Clang RV64IMAC, targeting [Muntjac](https://github.com/lowRISC/muntjac)
 
 How to do a release
 -------------------
