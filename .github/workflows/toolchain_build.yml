@@ -54,10 +54,6 @@ jobs:
           ./prepare-host.sh
           echo ::endgroup::
 
-          echo ::group::Install crosstool-ng
-          ./install-crosstool-ng.sh
-          echo ::endgroup::
-
           echo Preparing toolchain destination directory...
           sudo mkdir -p /tools/riscv
           sudo chmod 0777 /tools/riscv
