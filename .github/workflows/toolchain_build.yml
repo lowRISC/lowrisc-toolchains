@@ -95,6 +95,13 @@ jobs:
             "${{ matrix.mcmodel }}" \
             "${{ matrix.cflags }}"
 
+      - name: Package toolchains
+        run: |
+          ./create-prefixed-archive.sh \
+            "lowrisc-toolchain-${{ matrix.name }}-${HOST_ARCH}-${RELEASE_TAG}" \
+            "${{ matrix.output_dir }}" \
+            "${ARTIFACT_STAGING_DIR}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}-${{ matrix.host_arch }}-toolchains
@@ -120,4 +127,3 @@ jobs:
           # Upload this job's artifacts.
           gh release upload "$RELEASE_TAG" --clobber \
             "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-${{ matrix.name }}-${HOST_ARCH}-${RELEASE_TAG}.tar.xz" \
-            "${ARTIFACT_STAGING_DIR}/lowrisc-toolchain-gcc-${{ matrix.name }}-${HOST_ARCH}-${RELEASE_TAG}.tar.xz"
