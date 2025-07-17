@@ -49,8 +49,6 @@ build_top_dir="${PWD}"
 source "${build_top_dir}/sw-versions.sh"
 
 tag_name="${RELEASE_TAG:-HEAD}"
-host_arch="${HOST_ARCH:-x86_64}"
-toolchain_full_name="${toolchain_name}-${host_arch}-${tag_name}"
 
 mkdir -p "${build_top_dir}/build"
 cd "${build_top_dir}/build"
@@ -187,13 +185,3 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "build_host": "$(hostname)"
 }
 BUILDINFO_JSON
-
-# If `ARTIFACT_STAGING_DIR` is not set, we don't want to leave the final binary
-# in the root directory.
-artifact_dir="${ARTIFACT_STAGING_DIR:-${build_top_dir}/build}"
-
-# Package up toolchain directory
-"${build_top_dir}/create-prefixed-archive.sh" \
-  "${toolchain_full_name}" \
-  "${toolchain_dest}" \
-  "${artifact_dir}"
