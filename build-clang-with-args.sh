@@ -169,9 +169,6 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "clang_version": "${clang_version_string}",
   "clang_url": "${LLVM_URL}",
   "clang_git": "${LLVM_VERSION}",
-  "crosstool-ng_version": "${ct_ng_version_string}",
-  "crosstool-ng_url": "${CROSSTOOL_NG_URL}",
-  "crosstool-ng_git": "${CROSSTOOL_NG_VERSION}",
   "build_date": "${build_date}",
   "build_host": "$(hostname)"
 }
