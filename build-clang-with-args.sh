@@ -5,8 +5,6 @@
 
 ## build-clang-with-args.sh
 #
-# This requires a gcc toolchain dir made by `build-gcc-with-args.sh`
-#
 # Builds:
 # - Clang/LLVM
 #
@@ -26,10 +24,8 @@ fi;
 
 ## Take configuration from arguments
 # This is the name for the tar file.
-# Suggested to be the gcc config with s/gcc/clang/. Will be updated if it
-# contains 'gcc'
 toolchain_name="${1}"
-# This is the expected gcc target triple (so we can set a default, and invoke gcc)
+# This is the expected target triple (so we can set a default)
 toolchain_target="${2}"
 # This is the directory where we want the toolchain to added to
 toolchain_dest="${3}"
@@ -114,6 +110,9 @@ cmake "${llvm_dir}/llvm" \
   -DCMAKE_INSTALL_PREFIX="${toolchain_dest}" \
   -DLLVM_TARGETS_TO_BUILD="RISCV" \
   -DLLVM_ENABLE_PROJECTS="clang;lld;clang-tools-extra" \
+  -DLLVM_ENABLE_RUNTIMES="compiler-rt;libunwind;libcxxabi;libcxx" \
+  -DLIBCXX_USE_COMPILER_RT=YES \
+  -DLIBCXXABI_USE_COMPILER_RT=YES \
   -DLLVM_ENABLE_BACKTRACES=Off \
   -DLLVM_DEFAULT_TARGET_TRIPLE="${toolchain_target}" \
   -DLLVM_STATIC_LINK_CXX_STDLIB=On \
@@ -138,9 +137,6 @@ cd "${build_top_dir}"
 # These don't yet add cflags ldflags
 "${build_top_dir}/generate-clang-cmake-toolchain.sh" \
   "${toolchain_target}" "${toolchain_dest}" "${toolchain_cflags[@]}"
-"${build_top_dir}/generate-clang-meson-cross-file.sh" \
-  "${toolchain_target}" "${toolchain_dest}" ${march} ${mabi} ${mcmodel} \
-  "${toolchain_cflags[@]}"
 
 # Copy LLVM licenses into toolchain
 mkdir -p "${toolchain_dest}/share/licenses/llvm"
@@ -152,7 +148,6 @@ ls -l "${toolchain_dest}"
 set +o pipefail # head causes pipe failures, so we have to switch off pipefail while we use it.
 ct_ng_version_string="$( (set +o pipefail; ct-ng version | head -n1) )"
 clang_version_string="$("${toolchain_dest}/bin/clang" --version | head -n1)"
-gcc_version_string="$("${toolchain_dest}/bin/${toolchain_target}-gcc" --version | head -n1)"
 build_date="$(date -u)"
 set -o pipefail
 
@@ -165,9 +160,6 @@ lowRISC toolchain version: ${tag_name}
 Clang version:
   ${clang_version_string}
   (git: ${LLVM_URL} ${LLVM_VERSION})
-
-GCC version:
-  ${gcc_version_string}
 
 Crosstool-ng version:
   ${ct_ng_version_string}
@@ -187,21 +179,7 @@ tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
   "clang_version": "${clang_version_string}",
   "clang_url": "${LLVM_URL}",
   "clang_git": "${LLVM_VERSION}",
-  "gcc_version": "${gcc_version_string}",
-  "crosstool-ng_version": "${ct_ng_version_string}",
-  "crosstool-ng_url": "${CROSSTOOL_NG_URL}",
-  "crosstool-ng_git": "${CROSSTOOL_NG_VERSION}",
   "build_date": "${build_date}",
   "build_host": "$(hostname)"
 }
 BUILDINFO_JSON
-
-# If `ARTIFACT_STAGING_DIR` is not set, we don't want to leave the final binary
-# in the root directory.
-artifact_dir="${ARTIFACT_STAGING_DIR:-${build_top_dir}/build}"
-
-# Package up toolchain directory
-"${build_top_dir}/create-prefixed-archive.sh" \
-  "${toolchain_full_name}" \
-  "${toolchain_dest}" \
-  "${artifact_dir}"
