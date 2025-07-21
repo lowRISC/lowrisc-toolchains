@@ -51,8 +51,10 @@ cd "${build_top_dir}/build"
 
 
 llvm_dir="${build_top_dir}/build/llvm-project"
-if [ ! -d "${llvm_dir}" ]; then
-  git clone --branch ${LLVM_BRANCH} ${LLVM_URL} "${llvm_dir}"
+if [ ! -d "$llvm_dir" ]; then
+  git clone "$LLVM_URL" "$llvm_dir" \
+    --branch "$LLVM_BRANCH" \
+    --depth 1
 fi
 cd "${llvm_dir}"
 git fetch origin
