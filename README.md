@@ -9,21 +9,13 @@ Head over to the
 [GitHub releases for this repository](https://github.com/lowRISC/lowrisc-toolchains/releases)
 for pre-built toolchains.
 
-* A GCC RV32IMC without hardfloat support, targeting [Ibex](https://github.com/lowRISC/ibex/)
-* A GCC RV64IMAC, targeting [Muntjac](https://github.com/lowRISC/muntjac)
-* A GCC elf multilib toolchain
-* A GCC linux multilib toolchain
+* Clang RV32IMCB without hardfloat support, targeting [Ibex](https://github.com/lowRISC/ibex/)
+* Clang RV64IMAC, targeting [Muntjac](https://github.com/lowRISC/muntjac)
 
 How to do a release
 -------------------
 
-1. Modify any of the following variables to configure the build:
-   - `CROSSTOOL_NG_VERSION` in `install-crosstool-ng.sh`
-
-2. Modify any of the `*.config` files to update the crosstool-ng configurations
-   for a particular toolchain.
-
-3. Push the changes or do a pull request, and wait for the CI workflow to
+1. Push the changes or do a pull request, and wait for the CI workflow to
    complete.
 
    The build can be tested by downloading the GitHub artifacts.
@@ -31,14 +23,14 @@ How to do a release
      2. Select a workflow run from the list.
      4. Download the desired artifact from the bottom of the page and test it.
 
-4. Tag a release
+2. Tag a release
 
    ```bash
    VERSION=$(date +%Y%m%d)-1
    git tag -a -m "Release version $VERSION" $VERSION
    ```
 
-5. Push the tag
+3. Push the tag
 
    ```bash
    git push origin $VERSION

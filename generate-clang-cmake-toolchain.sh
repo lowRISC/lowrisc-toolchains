@@ -20,7 +20,7 @@ if ! [ "$#" -ge 2 ]; then
 fi;
 
 ## Take configuration from arguments
-# This is the gcc target triple
+# This is the target triple
 toolchain_target="${1}"
 # This is the directory where the toolchain has been installed.
 toolchain_dest="${2}"
