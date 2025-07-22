@@ -25,18 +25,20 @@ fi;
 ## Take configuration from arguments
 # This is the name for the tar file.
 toolchain_name="${1}"
+# This is the CMake build type (e.g. Release, Debug, RelWithDebInfo)
+build_type="${2}"
 # This is the expected target triple (so we can set a default)
-toolchain_target="${2}"
+toolchain_target="${3}"
 # This is the directory where we want the toolchain to added to
-toolchain_dest="${3}"
+toolchain_dest="${4}"
 # -march option default value
-march="${4}"
+march="${5}"
 # -mabi option default value
-mabi="${5}"
+mabi="${6}"
 # -mcmodel option default value
-mcmodel="${6}"
+mcmodel="${7}"
 # Remaining cflags for build configurations
-toolchain_cflags=("${@:7}")
+toolchain_cflags=("${@:8}")
 
 build_top_dir="${PWD}"
 
@@ -106,7 +108,7 @@ llvm_distribution_components+=";${llvm_tools}"
 
 cmake "${llvm_dir}/llvm" \
   -Wno-dev \
-  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_BUILD_TYPE="${build_type}" \
   -DCMAKE_INSTALL_PREFIX="${toolchain_dest}" \
   -DLLVM_TARGETS_TO_BUILD="RISCV" \
   -DLLVM_ENABLE_PROJECTS="clang;lld;clang-tools-extra" \
