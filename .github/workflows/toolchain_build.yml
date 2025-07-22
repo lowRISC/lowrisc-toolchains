@@ -82,6 +82,7 @@ jobs:
         run: |
           ./build-clang-with-args.sh \
             "lowrisc-toolchain-${{ matrix.name }}" \
+            Release \
             "${{ matrix.target }}" \
             "${{ matrix.output_dir }}" \
             "${{ matrix.march }}" \
