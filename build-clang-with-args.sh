@@ -22,6 +22,10 @@ if ! [ "$#" -ge 3 ]; then
   exit 2
 fi;
 
+repo_dir="$(git rev-parse --show-toplevel)"
+build_dir="${repo_dir}/build"
+dist_dir="${build_dir}/dist"
+
 ## Take configuration from arguments
 # This is the name for the tar file.
 toolchain_name="${1}"
@@ -29,30 +33,25 @@ toolchain_name="${1}"
 build_type="${2}"
 # This is the expected target triple (so we can set a default)
 toolchain_target="${3}"
-# This is the directory where we want the toolchain to added to
-toolchain_dest="${4}"
 # -march option default value
-march="${5}"
+march="${4}"
 # -mabi option default value
-mabi="${6}"
+mabi="${5}"
 # -mcmodel option default value
-mcmodel="${7}"
+mcmodel="${6}"
 # Remaining cflags for build configurations
-toolchain_cflags=("${@:8}")
-
-build_top_dir="${PWD}"
+toolchain_cflags=("${@:7}")
 
 # For *_VERSION variables
 # shellcheck source=sw-versions.sh
-source "${build_top_dir}/sw-versions.sh"
+source "${repo_dir}/sw-versions.sh"
 
 tag_name="${RELEASE_TAG:-HEAD}"
 
-mkdir -p "${build_top_dir}/build"
-cd "${build_top_dir}/build"
+mkdir -p "$build_dir"
+cd "$build_dir"
 
-
-llvm_dir="${build_top_dir}/build/llvm-project"
+llvm_dir="${build_dir}/llvm-project"
 if [ ! -d "$llvm_dir" ]; then
   git clone "$LLVM_URL" "$llvm_dir" \
     --branch "$LLVM_BRANCH" \
@@ -69,7 +68,7 @@ clang_links_to_create+=";${toolchain_target}-clang;${toolchain_target}-clang++"
 lld_links_to_create="ld.lld;ld64.lld"
 lld_links_to_create+=";${toolchain_target}-ld.lld;${toolchain_target}-ld64.lld"
 
-llvm_build_dir="${build_top_dir}/build/llvm-build"
+llvm_build_dir="${build_dir}/llvm-project/build"
 
 # Delete old build artifacts (if they exist)
 rm -rf "${llvm_build_dir}"
@@ -109,7 +108,7 @@ llvm_distribution_components+=";${llvm_tools}"
 cmake "${llvm_dir}/llvm" \
   -Wno-dev \
   -DCMAKE_BUILD_TYPE="${build_type}" \
-  -DCMAKE_INSTALL_PREFIX="${toolchain_dest}" \
+  -DCMAKE_INSTALL_PREFIX="${dist_dir}" \
   -DLLVM_TARGETS_TO_BUILD="RISCV" \
   -DLLVM_ENABLE_PROJECTS="clang;lld;clang-tools-extra" \
   -DLLVM_ENABLE_BACKTRACES=Off \
@@ -130,22 +129,22 @@ cmake --build "${llvm_build_dir}" \
   --parallel $(( $(nproc) + 2 )) \
   --target install-distribution
 
-cd "${build_top_dir}"
+cd "${repo_dir}"
 
 # Copy LLVM licenses into toolchain
-mkdir -p "${toolchain_dest}/share/licenses/llvm"
-cp "${llvm_dir}/llvm/LICENSE.TXT" "${toolchain_dest}/share/licenses/llvm"
+mkdir -p "${dist_dir}/share/licenses/llvm"
+cp "${llvm_dir}/llvm/LICENSE.TXT" "${dist_dir}/share/licenses/llvm"
 
-ls -l "${toolchain_dest}"
+ls -l "${dist_dir}"
 
 # Write out build info
 set +o pipefail # head causes pipe failures, so we have to switch off pipefail while we use it.
 ct_ng_version_string="$( (set +o pipefail; ct-ng version | head -n1) )"
-clang_version_string="$("${toolchain_dest}/bin/clang" --version | head -n1)"
+clang_version_string="$("${dist_dir}/bin/clang" --version | head -n1)"
 build_date="$(date -u)"
 set -o pipefail
 
-tee "${toolchain_dest}/buildinfo" <<BUILDINFO
+tee "${dist_dir}/buildinfo" <<BUILDINFO
 Report toolchain bugs to toolchains@lowrisc.org (include this file)
 
 lowRISC toolchain config:  ${toolchain_name}
@@ -165,7 +164,7 @@ C Flags:
 Built at ${build_date} on $(hostname)
 BUILDINFO
 
-tee "${toolchain_dest}/buildinfo.json" <<BUILDINFO_JSON
+tee "${dist_dir}/buildinfo.json" <<BUILDINFO_JSON
 {
   "toolchain_config": "${toolchain_name}",
   "kind": "combined",
