@@ -16,14 +16,15 @@ set -e -o pipefail
 repo_dir="$(git rev-parse --show-toplevel)"
 build_dir="${repo_dir}/build"
 patch_dir="${repo_dir}/patches"
+dist_dir="${build_dir}/dist"
 
 source "${repo_dir}/sw-versions.sh"
 
-if [ "$#" -ne 2 ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-  echo "USAGE: $0 <target> <dist dir>"    >&2
-  echo                                    >&2
-  echo "EXAMPLE:"                         >&2
-  echo "  $0 riscv32 dist/"               >&2
+if [ "$#" -ne 1 ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+  echo "USAGE: $0 <target>" >&2
+  echo                      >&2
+  echo "EXAMPLE:"           >&2
+  echo "  $0 riscv32"       >&2
   exit 1
 fi
 
@@ -39,9 +40,6 @@ if [ "$target_arch" != "riscv32" ] && [ "$target_arch" != "riscv64" ]; then
 fi
 
 set -x
-
-dist_dir="$(realpath "$2")"
-mkdir -p "$dist_dir"
 
 mkdir -p "$build_dir"
 cd "$build_dir"
@@ -59,6 +57,8 @@ git apply "${patch_dir}/binutils/"*
 
 mkdir -p build
 cd build
+
+mkdir -p "$dist_dir"
 
 # NOTE: We don't want to require `libexpat` to be dynamically linked.
 # It turns out to be quite hard to statically link *only* `libexpat`.
