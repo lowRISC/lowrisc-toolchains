@@ -2,9 +2,6 @@
 
 # This documents the versions of any software checked out from git
 
-# v4.0.1
-export QEMU_VERSION=23967e5b2a6c6d04b8db766a8a149f3631a7b899
-
 # LLVM 16.0.2 plus:
 # - hardening patches
 # - unratified bitmanip extensions
