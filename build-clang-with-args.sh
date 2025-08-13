@@ -14,33 +14,57 @@
 # - Creates a tar file of the whole install directory
 
 set -e
-set -x
 set -o pipefail
-
-if ! [ "$#" -ge 3 ]; then
-  echo "Usage: $0 <config_name> <target> <dest_dir> <march> <mabi> <mcmodel> <cflags...>"
-  exit 2
-fi;
 
 repo_dir="$(git rev-parse --show-toplevel)"
 build_dir="${repo_dir}/build"
 dist_dir="${build_dir}/dist"
 
-## Take configuration from arguments
-# This is the name for the tar file.
-toolchain_name="${1}"
-# This is the CMake build type (e.g. Release, Debug, RelWithDebInfo)
-build_type="${2}"
-# This is the expected target triple (so we can set a default)
-toolchain_target="${3}"
-# -march option default value
-march="${4}"
-# -mabi option default value
-mabi="${5}"
-# -mcmodel option default value
-mcmodel="${6}"
-# Remaining cflags for build configurations
-toolchain_cflags=("${@:7}")
+usage="\
+USAGE: ${0} [options] <args>
+
+OPTIONS:
+  -h,--help   Print this message
+     --debug  Build with assertions and debug info
+
+ARGS:
+     --name    <name>     Name of the toolchain
+     --target  <target>   Default target triple
+     --march   <march>    Default -march
+     --mabi    <mabi>     Default -mabi
+     --mcmodel <mcmodel>  Default -mcmodel
+"
+options="$(getopt -a -o '-h' -l 'help,name:,target:,march:,mabi:,mcmodel:,debug' -- "$@")"
+
+err() {
+  echo "ERROR ${1}" >&2
+  echo              >&2
+  echo "$usage"     >&2
+  exit 2
+}
+[[ "$options" == *"--name"* ]]    || err 'Missing argument `--name`'
+[[ "$options" == *"--target"* ]]  || err 'Missing argument `--target`'
+[[ "$options" == *"--march"* ]]   || err 'Missing argument `--march`'
+[[ "$options" == *"--mabi"* ]]    || err 'Missing argument `--mabi`'
+[[ "$options" == *"--mcmodel"* ]] || err 'Missing argument `--mcmodel`'
+
+build_type=Release
+
+eval set -- "$options"
+while true; do
+  case "$1" in
+    -h,--help) echo "$usage" && exit 0;;
+    --name)    toolchain_name="$2";   shift 2;;
+    --target)  toolchain_target="$2"; shift 2;;
+    --march)   march="$2";            shift 2;;
+    --mabi)    mabi="$2";             shift 2;;
+    --mcmodel) mcmodel="$2";          shift 2;;
+    --debug)   build_type=Debug;      shift 1;;
+    --)        shift; break;;
+  esac
+done
+
+set -x
 
 # For *_VERSION variables
 # shellcheck source=sw-versions.sh
@@ -159,7 +183,7 @@ Crosstool-ng version:
   (git: ${CROSSTOOL_NG_URL} ${CROSSTOOL_NG_VERSION})
 
 C Flags:
-  -march=${march} -mabi=${mabi} -mcmodel=${mcmodel} ${toolchain_cflags[@]}
+  -march=${march} -mabi=${mabi} -mcmodel=${mcmodel}
 
 Built at ${build_date} on $(hostname)
 BUILDINFO
