@@ -77,13 +77,11 @@ jobs:
       - name: Build Clang toolchain
         run: |
           ./build-clang-with-args.sh \
-            "lowrisc-toolchain-${{ matrix.name }}" \
-            Release \
-            "${{ matrix.target }}" \
-            "${{ matrix.march }}" \
-            "${{ matrix.mabi}}" \
-            "${{ matrix.mcmodel }}" \
-            "${{ matrix.cflags }}"
+            --name    "lowrisc-toolchain-${{ matrix.name }}" \
+            --target  "${{ matrix.target }}" \
+            --march   "${{ matrix.march }}" \
+            --mabi    "${{ matrix.mabi}}" \
+            --mcmodel "${{ matrix.mcmodel }}"
 
       - name: Package toolchains
         run: |
