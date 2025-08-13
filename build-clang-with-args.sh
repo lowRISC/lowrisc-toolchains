@@ -26,6 +26,7 @@ USAGE: ${0} [options] <args>
 OPTIONS:
   -h,--help   Print this message
      --debug  Build with assertions and debug info
+     --clean  Build from scratch
 
 ARGS:
      --name    <name>     Name of the toolchain
@@ -34,7 +35,7 @@ ARGS:
      --mabi    <mabi>     Default -mabi
      --mcmodel <mcmodel>  Default -mcmodel
 "
-options="$(getopt -a -o '-h' -l 'help,name:,target:,march:,mabi:,mcmodel:,debug' -- "$@")"
+options="$(getopt -a -o '-h' -l 'help,name:,target:,march:,mabi:,mcmodel:,debug,clean' -- "$@")"
 
 err() {
   echo "ERROR ${1}" >&2
@@ -49,6 +50,7 @@ err() {
 [[ "$options" == *"--mcmodel"* ]] || err 'Missing argument `--mcmodel`'
 
 build_type=Release
+clean=false
 
 eval set -- "$options"
 while true; do
@@ -60,6 +62,7 @@ while true; do
     --mabi)    mabi="$2";             shift 2;;
     --mcmodel) mcmodel="$2";          shift 2;;
     --debug)   build_type=Debug;      shift 1;;
+    --clean)   clean=true;            shift 1;;
     --)        shift; break;;
   esac
 done
@@ -94,8 +97,9 @@ lld_links_to_create+=";${toolchain_target}-ld.lld;${toolchain_target}-ld64.lld"
 
 llvm_build_dir="${build_dir}/llvm-project/build"
 
-# Delete old build artifacts (if they exist)
-rm -rf "${llvm_build_dir}"
+if [[ "$clean" == true ]]; then
+  rm -rf "${llvm_build_dir}"
+fi
 
 mkdir -p "${llvm_build_dir}"
 cd "${llvm_build_dir}"
