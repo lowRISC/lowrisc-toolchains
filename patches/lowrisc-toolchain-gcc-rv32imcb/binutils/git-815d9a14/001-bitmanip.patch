@@ -1,0 +1,339 @@
+commit fd6e38698009f8c402102d60010503447d1748ab
+Author: James Wainwright <james.wainwright@lowrisc.org>
+Date:   Mon Mar 3 17:42:38 2025 +0000
+
+    Add unratified bitmanip instructions
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index c9e4b03b17d..b0a8c07ff5c 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1381,6 +1381,13 @@ static struct riscv_supported_ext riscv_supported_std_z_ext[] =
+   {"zba",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zbc",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zbs",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
++  {"zbs",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
++  {"zbp",   ISA_SPEC_CLASS_DRAFT,   0, 93, 0 },
++  {"zbe",   ISA_SPEC_CLASS_DRAFT,   0, 93, 0 },
++  {"zbf",   ISA_SPEC_CLASS_DRAFT,   0, 93, 0 },
++  {"zbm",   ISA_SPEC_CLASS_DRAFT,   0, 93, 0 },
++  {"zbr",   ISA_SPEC_CLASS_DRAFT,   0, 93, 0 },
++  {"zbt",   ISA_SPEC_CLASS_DRAFT,   0, 93, 0 },
+   {"zbkb",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zbkc",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+   {"zbkx",		ISA_SPEC_CLASS_DRAFT,		1, 0,  0 },
+@@ -2679,6 +2686,18 @@ riscv_multi_subset_supports (riscv_parse_subset_t *rps,
+       return riscv_subset_supports (rps, "zbc");
+     case INSN_CLASS_ZBS:
+       return riscv_subset_supports (rps, "zbs");
++    case INSN_CLASS_ZBP:
++      return riscv_subset_supports (rps, "zbp");
++    case INSN_CLASS_ZBE:
++      return riscv_subset_supports (rps, "zbe");
++    case INSN_CLASS_ZBF:
++      return riscv_subset_supports (rps, "zbf");
++    case INSN_CLASS_ZBM:
++      return riscv_subset_supports (rps, "zbm");
++    case INSN_CLASS_ZBR:
++      return riscv_subset_supports (rps, "zbr");
++    case INSN_CLASS_ZBT:
++      return riscv_subset_supports (rps, "zbt");
+     case INSN_CLASS_ZBKB:
+       return riscv_subset_supports (rps, "zbkb");
+     case INSN_CLASS_ZBKC:
+@@ -2997,6 +3016,18 @@ riscv_multi_subset_supports_ext (riscv_parse_subset_t *rps,
+       return "zbc";
+     case INSN_CLASS_ZBS:
+       return "zbs";
++    case INSN_CLASS_ZBP:
++      return "zbp";
++    case INSN_CLASS_ZBE:
++      return "zbe";
++    case INSN_CLASS_ZBF:
++      return "zbf";
++    case INSN_CLASS_ZBM:
++      return "zbm";
++    case INSN_CLASS_ZBR:
++      return "zbr";
++    case INSN_CLASS_ZBT:
++      return "zbt";
+     case INSN_CLASS_ZBKB:
+       return "zbkb";
+     case INSN_CLASS_ZBKC:
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 71ad7fff84d..64033885032 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -3786,6 +3786,109 @@
+ #define MASK_SFVFNRCLIPXUFQF 0xfe00707f
+ #define MATCH_SFVFNRCLIPXFQF 0x8e00505b
+ #define MASK_SFVFNRCLIPXFQF 0xfe00707f
++/* Unratified Zbp instructions */
++#define MATCH_PACKU 0x48004033
++#define MASK_PACKU 0xfe00707f
++#define MATCH_PACKUW 0x4800403b
++#define MASK_PACKUW 0xfe00707f
++#define MATCH_GREV 0x68005033
++#define MASK_GREV 0xfe00707f
++#define MATCH_GREVIW 0x68005013
++#define MASK_GREVIW 0xfc00707f
++#define MATCH_GREVW 0x6800503b
++#define MASK_GREVW 0xfe00707f
++#define MATCH_GORC 0x28005033
++#define MASK_GORC 0xfe00707f
++#define MATCH_GORCIW 0x2800501b
++#define MASK_GORCIW 0xfe00707f
++#define MATCH_GORCW 0x2800503b
++#define MASK_GORCW 0xfe00707f
++#define MATCH_SHFL 0x8001033
++#define MASK_SHFL 0xfe00707f
++#define MATCH_SHFLW 0x800103b
++#define MASK_SHFLW 0xfe00707f
++#define MATCH_UNSHFL 0x8005033
++#define MASK_UNSHFL 0xfe00707f
++#define MATCH_UNSHFLW 0x800503b
++#define MASK_UNSHFLW 0xfe00707f
++#define MATCH_XPERMN 0x28002033
++#define MASK_XPERMN 0xfe00707f
++#define MATCH_XPERMB 0x28004033
++#define MASK_XPERMB 0xfe00707f
++#define MATCH_XPERMH 0x28006033
++#define MASK_XPERMH 0xfe00707f
++#define MATCH_XPERMW 0x28000033
++#define MASK_XPERMW 0xfe00707f
++/* Unratified Zbs instructions */
++#define MATCH_BSETW 0x2800103b
++#define MASK_BSETW 0xfe00707f
++#define MATCH_BSETIW 0x2800101b
++#define MASK_BSETIW 0xfe00707f
++#define MATCH_BCLRW 0x4800103b
++#define MASK_BCLRW 0xfe00707f
++#define MATCH_BCLRIW 0x4800101b
++#define MASK_BCLRIW 0xfe00707f
++#define MATCH_BEXTW 0x4800503b
++#define MASK_BEXTW 0xfe00707f
++#define MATCH_BINVW 0x6800103b
++#define MASK_BINVW 0xfe00707f
++#define MATCH_BINVIW 0x6800101b
++#define MASK_BINVIW 0xfe00707f
++/* Unratified Zbe instructions */
++#define MATCH_BCOMPRESS 0x8006033
++#define MASK_BCOMPRESS 0xfe00707f
++#define MATCH_BDECOMPRESS 0x48006033
++#define MASK_BDECOMPRESS 0xfe00707f
++#define MATCH_BCOMPRESSW 0x800603b
++#define MASK_BCOMPRESSW 0xfe00707f
++#define MATCH_BDECOMPRESSW 0x4800603b
++#define MASK_BDECOMPRESSW 0xfe00707f
++/* Unratified Zbf instructions */
++#define MATCH_BFP 0x48007033
++#define MASK_BFP 0xfe00707f
++#define MATCH_BFPW 0x4800703b
++#define MASK_BFPW 0xfe00707f
++/* Unratified Zbm instructions */
++#define MATCH_BMATFLIP 0x60301013
++#define MASK_BMATFLIP 0xfff0707f
++#define MATCH_BMATOR 0x8003033
++#define MASK_BMATOR 0xfe00707f
++#define MATCH_BMATXOR 0x48003033
++#define MASK_BMATXOR 0xfe00707f
++/* Unratified Zbr instructions */
++#define MATCH_CRC32_B 0x61001013
++#define MASK_CRC32_B 0xfff0707f
++#define MATCH_CRC32C_B 0x61801013
++#define MASK_CRC32C_B 0xfff0707f
++#define MATCH_CRC32_H 0x61101013
++#define MASK_CRC32_H 0xfff0707f
++#define MATCH_CRC32C_H 0x61901013
++#define MASK_CRC32C_H 0xfff0707f
++#define MATCH_CRC32_W 0x61201013
++#define MASK_CRC32_W 0xfff0707f
++#define MATCH_CRC32C_W 0x61a01013
++#define MASK_CRC32C_W 0xfff0707f
++#define MATCH_CRC32_D 0x61301013
++#define MASK_CRC32_D 0xfff0707f
++#define MATCH_CRC32C_D 0x61b01013
++#define MASK_CRC32C_D 0xfff0707f
++/* Unratified Zbt instructions */
++#define MATCH_CMIX 0x6001033
++#define MASK_CMIX 0x600707f
++#define MATCH_CMOV 0x6005033
++#define MASK_CMOV 0x600707f
++#define MATCH_FSL 0x4001033
++#define MASK_FSL 0x600707f
++#define MATCH_FSLW 0x400103b
++#define MASK_FSLW 0x600707f
++#define MATCH_FSR 0x4005033
++#define MASK_FSR 0x600707f
++#define MATCH_FSRI 0x4005013
++#define MASK_FSRI 0x400707f
++#define MATCH_FSRW 0x400503b
++#define MASK_FSRW 0x600707f
++#define MATCH_FSRIW 0x400501b
++#define MASK_FSRIW 0x600707f
+ /* Unprivileged Counter/Timers CSR addresses.  */
+ #define CSR_CYCLE 0xc00
+ #define CSR_TIME 0xc01
+@@ -4923,6 +5026,61 @@ DECLARE_INSN(ssamoswap_w, MATCH_SSAMOSWAP_W, MASK_SSAMOSWAP_W)
+ DECLARE_INSN(ssamoswap_d, MATCH_SSAMOSWAP_D, MASK_SSAMOSWAP_D)
+ /* Zicfilp instructions.  */
+ DECLARE_INSN(lpad, MATCH_LPAD, MASK_LPAD)
++/* Unratified Zbp instructions */
++DECLARE_INSN(packu, MATCH_PACKU, MASK_PACKU)
++DECLARE_INSN(packuw, MATCH_PACKUW, MASK_PACKUW)
++DECLARE_INSN(grev, MATCH_GREV, MASK_GREV)
++DECLARE_INSN(greviw, MATCH_GREVIW, MASK_GREVIW)
++DECLARE_INSN(grevw, MATCH_GREVW, MASK_GREVW)
++DECLARE_INSN(gorc, MATCH_GORC, MASK_GORC)
++DECLARE_INSN(gorciw, MATCH_GORCIW, MASK_GORCIW)
++DECLARE_INSN(gorcw, MATCH_GORCW, MASK_GORCW)
++DECLARE_INSN(shfl, MATCH_SHFL, MASK_SHFL)
++DECLARE_INSN(shflw, MATCH_SHFLW, MASK_SHFLW)
++DECLARE_INSN(unshfl, MATCH_UNSHFL, MASK_UNSHFL)
++DECLARE_INSN(unshflw, MATCH_UNSHFLW, MASK_UNSHFLW)
++DECLARE_INSN(xperm_n, MATCH_XPERM_N, MASK_XPERM_N)
++DECLARE_INSN(xperm_b, MATCH_XPERM_B, MASK_XPERM_B)
++DECLARE_INSN(xperm_h, MATCH_XPERM_H, MASK_XPERM_H)
++DECLARE_INSN(xperm_w, MATCH_XPERM_W, MASK_XPERM_W)
++/* Unratified Zbs instructions */
++DECLARE_INSN(bsetw, MATCH_BSETW, MASK_BSETW)
++DECLARE_INSN(bsetiw, MATCH_BSETIW, MASK_BSETIW)
++DECLARE_INSN(bclrw, MATCH_BCLRW, MASK_BCLRW)
++DECLARE_INSN(bclriw, MATCH_BCLRIW, MASK_BCLRIW)
++DECLARE_INSN(bextw, MATCH_BEXTW, MASK_BEXTW)
++DECLARE_INSN(binvw, MATCH_BINVW, MASK_BINVW)
++DECLARE_INSN(binviw, MATCH_BINVIW, MASK_BINVIW)
++/* Unratified Zbe instructions */
++DECLARE_INSN(bcompress, MATCH_BCOMPRESS, MASK_BCOMPRESS)
++DECLARE_INSN(bdecompress, MATCH_BDECOMPRESS, MASK_BDECOMPRESS)
++DECLARE_INSN(bcompressw, MATCH_BCOMPRESSW, MASK_BCOMPRESSW)
++DECLARE_INSN(bdecompressw, MATCH_BDECOMPRESSW, MASK_BDECOMPRESSW)
++/* Unratified Zbf instructions */
++DECLARE_INSN(bfp, MATCH_BFP, MASK_BFP)
++DECLARE_INSN(bfpw, MATCH_BFPW, MASK_BFPW)
++/* Unratified Zbm instructions */
++DECLARE_INSN(bmatflip, MATCH_BMATFLIP, MASK_BMATFLIP)
++DECLARE_INSN(bmator, MATCH_BMATOR, MASK_BMATOR)
++DECLARE_INSN(bmatxor, MATCH_BMATXOR, MASK_BMATXOR)
++/* Unratified Zbr instructions */
++DECLARE_INSN(crc32_b, MATCH_CRC32_B, MASK_CRC32_B)
++DECLARE_INSN(crc32c_b, MATCH_CRC32C_B, MASK_CRC32C_B)
++DECLARE_INSN(crc32_h, MATCH_CRC32_H, MASK_CRC32_H)
++DECLARE_INSN(crc32c_h, MATCH_CRC32C_H, MASK_CRC32C_H)
++DECLARE_INSN(crc32_w, MATCH_CRC32_W, MASK_CRC32_W)
++DECLARE_INSN(crc32c_w, MATCH_CRC32C_W, MASK_CRC32C_W)
++DECLARE_INSN(crc32_d, MATCH_CRC32_D, MASK_CRC32_D)
++DECLARE_INSN(crc32c_d, MATCH_CRC32C_D, MASK_CRC32C_D)
++/* Unratified Zbt instructions */
++DECLARE_INSN(cmix, MATCH_CMIX, MASK_CMIX)
++DECLARE_INSN(cmov, MATCH_CMOV, MASK_CMOV)
++DECLARE_INSN(fsl, MATCH_FSL, MASK_FSL)
++DECLARE_INSN(fslw, MATCH_FSLW, MASK_FSLW)
++DECLARE_INSN(fsr, MATCH_FSR, MASK_FSR)
++DECLARE_INSN(fsri, MATCH_FSRI, MASK_FSRI)
++DECLARE_INSN(fsrw, MATCH_FSRW, MASK_FSRW)
++DECLARE_INSN(fsriw, MATCH_FSRIW, MASK_FSRIW)
+ #endif /* DECLARE_INSN */
+ #ifdef DECLARE_CSR
+ /* Unprivileged Counter/Timers CSRs.  */
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 6bcea638025..24916f1a4d8 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -492,6 +492,12 @@ enum riscv_insn_class
+   INSN_CLASS_ZBB,
+   INSN_CLASS_ZBC,
+   INSN_CLASS_ZBS,
++  INSN_CLASS_ZBP,
++  INSN_CLASS_ZBE,
++  INSN_CLASS_ZBF,
++  INSN_CLASS_ZBM,
++  INSN_CLASS_ZBR,
++  INSN_CLASS_ZBT,
+   INSN_CLASS_ZBKB,
+   INSN_CLASS_ZBKC,
+   INSN_CLASS_ZBKX,
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index ceb94a563e2..4a6cf65a08d 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -3510,6 +3510,79 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"sf.vfnrclip.xu.f.qf", 0, INSN_CLASS_XSFVFNRCLIPXFQF, "Vd,Vt,S", MATCH_SFVFNRCLIPXUFQF, MASK_SFVFNRCLIPXUFQF, match_opcode, 0},
+ {"sf.vfnrclip.x.f.qf",  0, INSN_CLASS_XSFVFNRCLIPXFQF, "Vd,Vt,S", MATCH_SFVFNRCLIPXFQF, MASK_SFVFNRCLIPXFQF, match_opcode, 0},
+ 
++/* Unratified Zbp instructions */
++{"packu",     0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_PACKU, MASK_PACKU, match_opcode, 0 },
++{"packuw",   64, INSN_CLASS_ZBP,   "d,s,t",  MATCH_PACKUW, MASK_PACKUW, match_opcode, 0 },
++{"grev",      0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_GREV, MASK_GREV, match_opcode, 0 },
++{"grev",      0, INSN_CLASS_ZBP,   "d,s,>",  MATCH_GREVI, MASK_GREVI, match_opcode, INSN_ALIAS },
++{"greviw",   64, INSN_CLASS_ZBP,   "d,s,<",  MATCH_GREVIW, MASK_GREVIW, match_opcode, 0 },
++{"grevw",    64, INSN_CLASS_ZBP,   "d,s,t",  MATCH_GREVW, MASK_GREVW, match_opcode, 0 },
++{"grevw",    64, INSN_CLASS_ZBP,   "d,s,<",  MATCH_GREVIW, MASK_GREVIW, match_opcode, INSN_ALIAS },
++{"gorc",      0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_GORC, MASK_GORC, match_opcode, 0 },
++{"gorc",      0, INSN_CLASS_ZBP,   "d,s,>",  MATCH_GORCI, MASK_GORCI, match_opcode, INSN_ALIAS },
++{"gorciw",   64, INSN_CLASS_ZBP,   "d,s,<",  MATCH_GORCIW, MASK_GORCIW, match_opcode, 0 },
++{"gorcw",    64, INSN_CLASS_ZBP,   "d,s,t",  MATCH_GORCW, MASK_GORCW, match_opcode, 0 },
++{"gorcw",    64, INSN_CLASS_ZBP,   "d,s,<",  MATCH_GORCIW, MASK_GORCIW, match_opcode, INSN_ALIAS },
++{"shfl",      0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_SHFL, MASK_SHFL, match_opcode, 0 },
++{"shfl",      0, INSN_CLASS_ZBP,   "d,s,|",  MATCH_SHFLI, MASK_SHFLI, match_opcode, INSN_ALIAS },
++{"shflw",    64, INSN_CLASS_ZBP,   "d,s,t",  MATCH_SHFLW, MASK_SHFLW, match_opcode, 0 },
++{"unshfl",    0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_UNSHFL, MASK_UNSHFL, match_opcode, 0 },
++{"unshfl",    0, INSN_CLASS_ZBP,   "d,s,|",  MATCH_UNSHFLI, MASK_UNSHFLI, match_opcode, INSN_ALIAS },
++{"unshflw",  64, INSN_CLASS_ZBP,   "d,s,t",  MATCH_UNSHFLW, MASK_UNSHFLW, match_opcode, 0 },
++{"xperm.n",   0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_XPERMN, MASK_XPERMN, match_opcode, 0 },
++{"xperm.b",   0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_XPERMB, MASK_XPERMB, match_opcode, 0 },
++{"xperm.h",   0, INSN_CLASS_ZBP,   "d,s,t",  MATCH_XPERMH, MASK_XPERMH, match_opcode, 0 },
++{"xperm.w",  64, INSN_CLASS_ZBP,   "d,s,t",  MATCH_XPERMW, MASK_XPERMW, match_opcode, 0 },
++
++/* Unratified Zbs instructions */
++{"bsetw",    64, INSN_CLASS_ZBS,   "d,s,t",  MATCH_BSETW, MASK_BSETW, match_opcode, 0 },
++{"bsetw",    64, INSN_CLASS_ZBS,   "d,s,<",  MATCH_BSETIW, MASK_BSETIW, match_opcode, INSN_ALIAS },
++{"bsetiw",   64, INSN_CLASS_ZBS,   "d,s,<",  MATCH_BSETIW, MASK_BSETIW, match_opcode, 0 },
++{"bclrw",    64, INSN_CLASS_ZBS,   "d,s,t",  MATCH_BCLRW, MASK_BCLRW, match_opcode, 0 },
++{"bclrw",    64, INSN_CLASS_ZBS,   "d,s,<",  MATCH_BCLRIW, MASK_BCLRIW, match_opcode, INSN_ALIAS },
++{"bclriw",   64, INSN_CLASS_ZBS,   "d,s,<",  MATCH_BCLRIW, MASK_BCLRIW, match_opcode, 0 },
++{"bextw",    64, INSN_CLASS_ZBS,   "d,s,t",  MATCH_BEXTW, MASK_BEXTW, match_opcode, 0 },
++{"binvw",    64, INSN_CLASS_ZBS,   "d,s,t",  MATCH_BINVW, MASK_BINVW, match_opcode, 0 },
++{"binvw",    64, INSN_CLASS_ZBS,   "d,s,<",  MATCH_BINVIW, MASK_BINVIW, match_opcode, INSN_ALIAS },
++{"binviw",   64, INSN_CLASS_ZBS,   "d,s,<",  MATCH_BINVIW, MASK_BINVIW, match_opcode, 0 },
++
++/* Unratified Zbe instructions */
++{"bcompress", 0, INSN_CLASS_ZBE,   "d,s,t",  MATCH_BCOMPRESS, MASK_BCOMPRESS, match_opcode, 0 },
++{"bdecompress", 0, INSN_CLASS_ZBE,   "d,s,t",  MATCH_BDECOMPRESS, MASK_BDECOMPRESS, match_opcode, 0 },
++{"bcompressw",   64, INSN_CLASS_ZBE,   "d,s,t",  MATCH_BCOMPRESSW, MASK_BCOMPRESSW, match_opcode, 0 },
++{"bdecompressw", 64, INSN_CLASS_ZBE,   "d,s,t",  MATCH_BDECOMPRESSW, MASK_BDECOMPRESSW, match_opcode, 0 },
++
++/* Unratified Zbf instructions */
++{"bfp",       0, INSN_CLASS_ZBF,   "d,s,t",  MATCH_BFP, MASK_BFP, match_opcode, 0 },
++{"bfpw",     64, INSN_CLASS_ZBF,   "d,s,t",  MATCH_BFPW, MASK_BFPW, match_opcode, 0 },
++
++/* Unratified Zbm instructions */
++{"bmatflip", 64, INSN_CLASS_ZBM,   "d,s",  MATCH_BMATFLIP, MASK_BMATFLIP, match_opcode, 0 },
++{"bmator",   64, INSN_CLASS_ZBM,   "d,s,t",  MATCH_BMATOR, MASK_BMATOR, match_opcode, 0 },
++{"bmatxor",  64, INSN_CLASS_ZBM,   "d,s,t",  MATCH_BMATXOR, MASK_BMATXOR, match_opcode, 0 },
++
++/* Unratified Zbr instructions */
++{"crc32.b",   0, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32_B, MASK_CRC32_B, match_opcode, 0 },
++{"crc32.h",   0, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32_H, MASK_CRC32_H, match_opcode, 0 },
++{"crc32.w",   0, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32_W, MASK_CRC32_W, match_opcode, 0 },
++{"crc32.d",  64, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32_D, MASK_CRC32_D, match_opcode, 0 },
++{"crc32c.b",  0, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32C_B, MASK_CRC32C_B, match_opcode, 0 },
++{"crc32c.h",  0, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32C_H, MASK_CRC32C_H, match_opcode, 0 },
++{"crc32c.w",  0, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32C_W, MASK_CRC32C_W, match_opcode, 0 },
++{"crc32c.d", 64, INSN_CLASS_ZBR,   "d,s",  MATCH_CRC32C_D, MASK_CRC32C_D, match_opcode, 0 },
++
++/* Unratified Zbt instructions */
++{"cmix",      0, INSN_CLASS_ZBT,   "d,t,s,r",  MATCH_CMIX, MASK_CMIX, match_opcode, 0 },
++{"cmov",      0, INSN_CLASS_ZBT,   "d,t,s,r",  MATCH_CMOV, MASK_CMOV, match_opcode, 0 },
++{"fsl",       0, INSN_CLASS_ZBT,   "d,s,r,t",  MATCH_FSL, MASK_FSL, match_opcode, 0 },
++{"fslw",     64, INSN_CLASS_ZBT,   "d,s,r,t",  MATCH_FSLW, MASK_FSLW, match_opcode, 0 },
++{"fsr",       0, INSN_CLASS_ZBT,   "d,s,r,t",  MATCH_FSR, MASK_FSR, match_opcode, 0 },
++{"fsr",       0, INSN_CLASS_ZBT,   "d,s,r,>",  MATCH_FSRI, MASK_FSRI, match_opcode, INSN_ALIAS },
++{"fsri",      0, INSN_CLASS_ZBT,   "d,s,r,>",  MATCH_FSRI, MASK_FSRI, match_opcode, 0 },
++{"fsrw",     64, INSN_CLASS_ZBT,   "d,s,r,t",  MATCH_FSRW, MASK_FSRW, match_opcode, 0 },
++{"fsrw",     64, INSN_CLASS_ZBT,   "d,s,r,<",  MATCH_FSRIW, MASK_FSRIW, match_opcode, INSN_ALIAS },
++{"fsriw",    64, INSN_CLASS_ZBT,   "d,s,r,<",  MATCH_FSRIW, MASK_FSRIW, match_opcode, 0 },
++
+ /* Terminate the list.  */
+ {0, 0, INSN_CLASS_NONE, 0, 0, 0, 0, 0}
+ };
