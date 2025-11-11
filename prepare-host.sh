@@ -9,6 +9,9 @@ set -x
 # Repository for the `gh` GitHub CLI tool used for creating releases.
 dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
 
+# Repository for expat-static
+dnf install -y almalinux-release-devel
+
 dnf install -y \
   sudo \
   gh \
@@ -27,4 +30,5 @@ dnf install -y \
   python36 \
   zlib-devel \
   zlib-static \
-  libffi-devel
+  libffi-devel \
+  expat-static

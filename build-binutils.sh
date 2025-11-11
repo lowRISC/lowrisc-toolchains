@@ -60,13 +60,11 @@ cd build
 
 mkdir -p "$dist_dir"
 
-# NOTE: We don't want to require `libexpat` to be dynamically linked.
-# It turns out to be quite hard to statically link *only* `libexpat`.
 ../configure \
-  --target "$target" \
+  --target="$target" \
   --program-prefix="$target-" \
-  --prefix "$dist_dir" \
-  --with-expat=no
+  --prefix="$dist_dir" \
+  --with-libexpat-type=static
 
 make -j "$(nproc)"
 make install

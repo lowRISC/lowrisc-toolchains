@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0, see LICENSE for details.
 # SPDX-License-Identifier: Apache-2.0
 
-IMAGE=lowrisc/lowrisc-base-centos6:latest
+IMAGE=quay.io/pypa/manylinux_2_28_x86_64
 
 exec docker run -t -i \
   -v $(pwd):/home/dev/src \
