@@ -33,3 +33,13 @@ dnf install -y \
   libffi-devel \
   expat-static \
   lld
+
+# the version of ninja in almalinux-8 is too old -
+# we need at least version v1.10, so just build it ourselves
+TMP_DIR="$(mktemp -d)"
+git clone https://github.com/ninja-build/ninja.git \
+    --branch v1.12.0 --depth 1 "${TMP_DIR}"
+cd "${TMP_DIR}"
+./configure.py --bootstrap
+install ninja /bin
+rm -rf "{$TMP_DIR}"

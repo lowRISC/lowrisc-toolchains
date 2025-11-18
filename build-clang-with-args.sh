@@ -135,6 +135,7 @@ llvm_distribution_components+=";${llvm_tools}"
 
 cmake "${llvm_dir}/llvm" \
   -Wno-dev \
+  -GNinja \
   -DCMAKE_BUILD_TYPE="${build_type}" \
   -DCMAKE_INSTALL_PREFIX="${dist_dir}" \
   -DLLVM_TARGETS_TO_BUILD="RISCV" \
