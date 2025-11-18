@@ -142,6 +142,7 @@ cmake "${llvm_dir}/llvm" \
   -DLLVM_ENABLE_BACKTRACES=Off \
   -DLLVM_DEFAULT_TARGET_TRIPLE="${toolchain_target}" \
   -DLLVM_STATIC_LINK_CXX_STDLIB=On \
+  -DLLVM_USE_LINKER="lld" \
   -DCLANG_VENDOR="lowRISC" \
   -DBUG_REPORT_URL="toolchains@lowrisc.org" \
   -DLLVM_INCLUDE_EXAMPLES=Off \

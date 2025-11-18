@@ -31,4 +31,5 @@ dnf install -y \
   zlib-devel \
   zlib-static \
   libffi-devel \
-  expat-static
+  expat-static \
+  lld
