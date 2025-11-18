@@ -32,7 +32,8 @@ dnf install -y \
   zlib-static \
   libffi-devel \
   expat-static \
-  lld
+  lld \
+  dejagnu
 
 # the version of ninja in almalinux-8 is too old -
 # we need at least version v1.10, so just build it ourselves

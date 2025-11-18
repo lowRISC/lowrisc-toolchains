@@ -17,6 +17,7 @@ repo_dir="$(git rev-parse --show-toplevel)"
 build_dir="${repo_dir}/build"
 patch_dir="${repo_dir}/patches"
 dist_dir="${build_dir}/dist"
+static_libs_dir="${build_dir}/libs"
 
 source "${repo_dir}/sw-versions.sh"
 
@@ -41,7 +42,9 @@ fi
 
 set -x
 
+mkdir -p "$dist_dir"
 mkdir -p "$build_dir"
+mkdir -p "$static_libs_dir"
 cd "$build_dir"
 
 if [ ! -d binutils ]; then
@@ -50,21 +53,54 @@ if [ ! -d binutils ]; then
     --depth 1
 fi
 
-cd binutils
-git reset --hard
-git checkout "$BINUTILS_COMMIT"
-git apply "${patch_dir}/binutils/"*
+if [ ! -d gmp ]; then
+    tmp=$(mktemp -d)
+    mkdir -p ${tmp}/gmp
+    curl -L "$GMP_URL" -o "${tmp}/gmp.tar.xz"
+    printf "$GMP_SHA256  ${tmp}/gmp.tar.xz\n" > ${tmp}/gmp.sha256
+    sha256sum -c ${tmp}/gmp.sha256
+    xzcat ${tmp}/gmp.tar.xz | tar --strip-components=1 -C ${tmp}/gmp -x -v -f -
+    mv ${tmp}/gmp gmp
+    rm ${tmp}/gmp.tar.xz
+fi
 
+if [ ! -d mpfr ]; then
+    git clone "$MPFR_URL" mpfr \
+    --branch "$MPFR_BRANCH" \
+    --depth 1
+fi
+
+cd gmp
+./configure \
+    --enable-static=yes \
+    --enable-shared=no \
+    --prefix=$static_libs_dir
+make -j "$(nproc)"
+make -j "$(nproc)" check
+make install
+cd ..
+
+cd mpfr
+./autogen.sh
+./configure \
+    --enable-static=yes \
+    --enable-shared=no \
+    --with-gmp=$static_libs_dir \
+    --prefix=$static_libs_dir
+make -j "$(nproc)"
+make install
+cd ..
+
+cd binutils
 mkdir -p build
 cd build
-
-mkdir -p "$dist_dir"
-
 ../configure \
-  --target="$target" \
-  --program-prefix="$target-" \
-  --prefix="$dist_dir" \
-  --with-libexpat-type=static
-
+    --target="$target" \
+    --program-prefix="$target-" \
+    --prefix="$dist_dir" \
+    --with-libexpat-type=static \
+    --with-gmp=$static_libs_dir \
+    --with-mpfr=$static_libs_dir
 make -j "$(nproc)"
+make -C gas check
 make install

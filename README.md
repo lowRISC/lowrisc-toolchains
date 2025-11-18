@@ -40,17 +40,6 @@ How to do a release
    will be uploaded to
    [GitHub releases](https://github.com/lowRISC/lowrisc-toolchains/releases).
 
-How to generate the bitmanip patch
-------------------------------------
-
-```
-git clone https://github.com/riscv-collab/riscv-binutils-gdb.git
-cd riscv-binutils-gdb
-# checkout Pirmin's bitmanip 1.00+0.93 PR (https://github.com/riscv-collab/riscv-binutils-gdb/pull/267)
-gh pr checkout 267
-# 7c9dd840 (riscv-binutils-2.35-rvb) is our baseline
-git diff 7c9dd840 > $TOP/patches/lowrisc-toolchain-gcc-rv32imcb/binutils/git-7c9dd840/001-bitmanip.patch
-```
 How to install pre-built toolchain
 ------------------------------------
 1. Download a tar.gz file from release page.
