@@ -167,7 +167,6 @@ ls -l "${dist_dir}"
 
 # Write out build info
 set +o pipefail # head causes pipe failures, so we have to switch off pipefail while we use it.
-ct_ng_version_string="$( (set +o pipefail; ct-ng version | head -n1) )"
 clang_version_string="$("${dist_dir}/bin/clang" --version | head -n1)"
 build_date="$(date -u)"
 set -o pipefail
@@ -181,10 +180,6 @@ lowRISC toolchain version: ${tag_name}
 Clang version:
   ${clang_version_string}
   (git: ${LLVM_URL} ${LLVM_VERSION})
-
-Crosstool-ng version:
-  ${ct_ng_version_string}
-  (git: ${CROSSTOOL_NG_URL} ${CROSSTOOL_NG_VERSION})
 
 C Flags:
   -march=${march} -mabi=${mabi} -mcmodel=${mcmodel}
