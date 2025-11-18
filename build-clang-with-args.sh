@@ -86,7 +86,7 @@ if [ ! -d "$llvm_dir" ]; then
 fi
 cd "${llvm_dir}"
 git fetch origin
-git checkout --force "${LLVM_VERSION}"
+git checkout --force "${LLVM_COMMIT}"
 
 # Clang Symlinks
 clang_links_to_create="clang++"
@@ -179,7 +179,7 @@ lowRISC toolchain version: ${tag_name}
 
 Clang version:
   ${clang_version_string}
-  (git: ${LLVM_URL} ${LLVM_VERSION})
+  (git: ${LLVM_URL} ${LLVM_COMMIT})
 
 C Flags:
   -march=${march} -mabi=${mabi} -mcmodel=${mcmodel}
@@ -194,7 +194,7 @@ tee "${dist_dir}/buildinfo.json" <<BUILDINFO_JSON
   "version": "${tag_name}",
   "clang_version": "${clang_version_string}",
   "clang_url": "${LLVM_URL}",
-  "clang_git": "${LLVM_VERSION}",
+  "clang_git": "${LLVM_COMMIT}",
   "build_date": "${build_date}",
   "build_host": "$(hostname)"
 }
