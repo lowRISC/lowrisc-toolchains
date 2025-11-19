@@ -86,7 +86,7 @@ if [ ! -d "$llvm_dir" ]; then
 fi
 cd "${llvm_dir}"
 git fetch origin
-git checkout --force "${LLVM_VERSION}"
+git checkout --force "${LLVM_COMMIT}"
 
 # Clang Symlinks
 clang_links_to_create="clang++"
@@ -135,6 +135,7 @@ llvm_distribution_components+=";${llvm_tools}"
 
 cmake "${llvm_dir}/llvm" \
   -Wno-dev \
+  -GNinja \
   -DCMAKE_BUILD_TYPE="${build_type}" \
   -DCMAKE_INSTALL_PREFIX="${dist_dir}" \
   -DLLVM_TARGETS_TO_BUILD="RISCV" \
@@ -142,6 +143,7 @@ cmake "${llvm_dir}/llvm" \
   -DLLVM_ENABLE_BACKTRACES=Off \
   -DLLVM_DEFAULT_TARGET_TRIPLE="${toolchain_target}" \
   -DLLVM_STATIC_LINK_CXX_STDLIB=On \
+  -DLLVM_USE_LINKER="lld" \
   -DCLANG_VENDOR="lowRISC" \
   -DBUG_REPORT_URL="toolchains@lowrisc.org" \
   -DLLVM_INCLUDE_EXAMPLES=Off \
@@ -167,7 +169,6 @@ ls -l "${dist_dir}"
 
 # Write out build info
 set +o pipefail # head causes pipe failures, so we have to switch off pipefail while we use it.
-ct_ng_version_string="$( (set +o pipefail; ct-ng version | head -n1) )"
 clang_version_string="$("${dist_dir}/bin/clang" --version | head -n1)"
 build_date="$(date -u)"
 set -o pipefail
@@ -180,11 +181,7 @@ lowRISC toolchain version: ${tag_name}
 
 Clang version:
   ${clang_version_string}
-  (git: ${LLVM_URL} ${LLVM_VERSION})
-
-Crosstool-ng version:
-  ${ct_ng_version_string}
-  (git: ${CROSSTOOL_NG_URL} ${CROSSTOOL_NG_VERSION})
+  (git: ${LLVM_URL} ${LLVM_COMMIT})
 
 C Flags:
   -march=${march} -mabi=${mabi} -mcmodel=${mcmodel}
@@ -199,7 +196,7 @@ tee "${dist_dir}/buildinfo.json" <<BUILDINFO_JSON
   "version": "${tag_name}",
   "clang_version": "${clang_version_string}",
   "clang_url": "${LLVM_URL}",
-  "clang_git": "${LLVM_VERSION}",
+  "clang_git": "${LLVM_COMMIT}",
   "build_date": "${build_date}",
   "build_host": "$(hostname)"
 }
